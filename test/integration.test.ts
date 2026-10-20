@@ -63,9 +63,11 @@ describe.each(selectedRunners)('in a real %s run', (runner) => {
   ) => {
     const imagePath = path.join(directory, 'screenshot.png')
     fs.writeFileSync(imagePath, image)
-    // CI changes both runners' defaults for writing snapshots, so it is removed
+    // Both runners stop writing new snapshots when they detect CI. Jest gets --ci=false,
+    // Vitest 3 has no equivalent flag, so the variables it detects CI by are removed.
     const env = { ...process.env }
     delete env.CI
+    delete env.GITHUB_ACTIONS
     const result = spawnSync(process.execPath, args(modules, project, update), {
       cwd: project,
       env: {

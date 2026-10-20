@@ -14,4 +14,13 @@ export default defineConfig(
     files: ['test/integration/jest-project/**', 'bench/jest-project/**'],
     languageOptions: { globals: globals.jest },
   },
+  {
+    // Fixture projects import the package by name, which each runner's config maps to the
+    // build. Node resolution only finds it after a build, so these checks don't apply.
+    files: ['test/integration/*-project/**', 'bench/*-project/**'],
+    rules: {
+      'n/no-missing-import': 'off',
+      'n/no-missing-require': 'off',
+    },
+  },
 )

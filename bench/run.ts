@@ -95,9 +95,10 @@ const results: Result[] = []
 for (const [runner, args] of Object.entries(RUNNERS)) {
   for (const implementation of IMPLEMENTATIONS) {
     const resultsFile = path.join(work, `${runner}-${implementation.replaceAll(/\W/g, '_')}.jsonl`)
-    // CI changes the runners' defaults for writing new snapshots
+    // Both runners stop writing new snapshots when they detect CI
     const env = { ...process.env }
     delete env.CI
+    delete env.GITHUB_ACTIONS
     process.stderr.write(`${runner} / ${implementation}\n`)
     const run = spawnSync(process.execPath, args, {
       cwd: root,
