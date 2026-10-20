@@ -3,6 +3,20 @@
   "version": "0.0.0",
   "description": "Fast drop-in replacement for jest-image-snapshot, for Vitest and Jest",
   "license": "Apache-2.0",
+  "author": "brachkow",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/brachkow/vitest-image-snapshot.git"
+  },
+  "keywords": [
+    "vitest",
+    "jest",
+    "image",
+    "snapshot",
+    "visual regression",
+    "screenshot",
+    "jest-image-snapshot"
+  ],
   "type": "module",
   "engines": {
     "node": ">=22.13.0"
@@ -38,7 +52,12 @@
     "NOTICE",
     "LICENSE"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
+    "prepack": "tsdown",
+    "prepublishOnly": "pnpm lint && pnpm typecheck && pnpm test && pnpm test:original",
     "build": "tsdown",
     "test": "vitest run",
     "test:original": "tsdown && cd test/original && jest --config jest.config.cjs --ci=false",
@@ -85,15 +104,5 @@
     "tsdown": "^0.23.1",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
     "vitest": "^5.0.5"
-  },
-  "keywords": [
-    "vitest",
-    "jest",
-    "image",
-    "snapshot",
-    "visual regression",
-    "screenshot",
-    "jest-image-snapshot"
-  ],
-  "author": "Timur Brachkow"
+  }
 }
