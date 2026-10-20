@@ -1,0 +1,6 @@
+# Reviewed build scripts. These only verify or download native binaries that the
+# packages already ship as optional dependencies; nothing here needs them.
+allowBuilds:
+  '@parcel/watcher': false
+  esbuild: false
+  unrs-resolver: false

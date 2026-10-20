@@ -1,0 +1,5 @@
+node_modules
+dist
+.jest-image-snapshot-touched-files
+test/original/__custom_snapshots_dir__
+test/original/__image_snapshots__/__diff_output__

@@ -1,0 +1,12 @@
+@brachkow/vitest-image-snapshot
+Copyright 2026 Timur Brachkow
+
+This product is derived from jest-image-snapshot
+(https://github.com/americanexpress/jest-image-snapshot), version 6.5.2.
+Copyright 2016-2017 American Express Travel Related Services Company, Inc.
+Licensed under the Apache License, Version 2.0.
+
+Changes from the original: rewritten in TypeScript, PNG decoding and encoding
+moved from pngjs to sharp, the per-check child process replaced with a worker
+thread, and byte-identical images matched without decoding. Files derived from
+the original carry a notice at the top describing their changes.
