@@ -75,7 +75,7 @@
     "eslint": "^10.13.0",
     "eslint-config-fans": "^1.11.0",
     "globals": "^17.13.0",
-    "image-size": "^0.8.3",
+    "image-size": "^2.0.4",
     "jest": "^30.5.2",
     "jest-image-snapshot": "6.5.2",
     "jest-snapshot": "^30.5.2",
