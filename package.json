@@ -1,6 +1,6 @@
 {
   "name": "@brachkow/vitest-image-snapshot",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Fast drop-in replacement for jest-image-snapshot, for Vitest and Jest",
   "license": "Apache-2.0",
   "author": "brachkow",
