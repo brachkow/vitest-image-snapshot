@@ -214,6 +214,7 @@ export const configureToMatchImageSnapshot = ({
   dumpInlineDiffToConsole: commonDumpInlineDiffToConsole = false,
   allowSizeMismatch: commonAllowSizeMismatch = false,
   comparisonMethod: commonComparisonMethod = 'pixelmatch',
+  diffCompressionLevel: commonDiffCompressionLevel = 1,
 }: MatchImageSnapshotOptions = {}) =>
   function toMatchImageSnapshot(
     this: MatcherContext,
@@ -238,6 +239,7 @@ export const configureToMatchImageSnapshot = ({
       dumpInlineDiffToConsole = commonDumpInlineDiffToConsole,
       allowSizeMismatch = commonAllowSizeMismatch,
       comparisonMethod = commonComparisonMethod,
+      diffCompressionLevel = commonDiffCompressionLevel,
     }: MatchImageSnapshotOptions = {},
   ): MatcherResult {
     const { testPath = '', currentTestName = '', isNot } = this
@@ -295,6 +297,7 @@ export const configureToMatchImageSnapshot = ({
       blur,
       allowSizeMismatch,
       comparisonMethod,
+      diffCompressionLevel,
       runtimeHooksPath,
       includeImgSrcString: dumpDiffToConsole || dumpInlineDiffToConsole,
     })

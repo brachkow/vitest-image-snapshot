@@ -49,10 +49,10 @@ export const decodePng = async (buffer: Buffer): Promise<RawImage> => {
   }
 }
 
-export const encodePng = (image: RawImage): Promise<Buffer> =>
+// Level 1 is 4-5x faster than the default 6 for a few times larger diff files
+export const encodePng = (image: RawImage, compressionLevel = 1): Promise<Buffer> =>
   sharp(image.data, { raw: { width: image.width, height: image.height, channels: RGBA_CHANNELS } })
-    // Level 1 is 4-5x faster than the default 6 for a few times larger diff files
-    .png({ compressionLevel: 1 })
+    .png({ compressionLevel })
     .toBuffer()
 
 export const createImage = (width: number, height: number): RawImage => ({

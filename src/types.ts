@@ -41,6 +41,11 @@ export interface MatchImageSnapshotOptions {
   /** Accepted for compatibility. No child process is spawned. */
   maxChildProcessBufferSizeInBytes?: number
   comparisonMethod?: ComparisonMethod
+  /**
+   * zlib level for diff images, 0 to 9. The default 1 encodes 4-5x faster than 6 and writes
+   * larger files. Raise it when diff artifacts are uploaded and their size matters.
+   */
+  diffCompressionLevel?: number
 }
 
 export interface DiffOptions {
@@ -61,6 +66,7 @@ export interface DiffOptions {
   blur?: number
   allowSizeMismatch?: boolean
   comparisonMethod?: ComparisonMethod
+  diffCompressionLevel?: number
   testPath?: string
   currentTestName?: string
   runtimeHooksPath?: string

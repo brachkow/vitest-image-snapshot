@@ -49,6 +49,14 @@ expect(image).toMatchImageSnapshot()
 
 It throws if the screenshot still changes after `timeout` milliseconds, 5000 by default: `waitForStableScreenshot(capture, { timeout: 10000 })`.
 
+### Smaller diff files
+
+Diff images use zlib level 1 by default, which encodes 4 to 5 times faster than level 6. When CI uploads diff images and their size matters, `diffCompressionLevel` sets a level from 0 to 9. It changes only the file size, the pixels stay the same.
+
+```js
+expect(image).toMatchImageSnapshot({ diffCompressionLevel: 9 })
+```
+
 ### Counting like Vitest's toMatchScreenshot
 
 `comparisonMethod: 'blazediff'` compares with [`@blazediff/core`](https://github.com/teimurjan/blazediff), the library Vitest 5's built-in `toMatchScreenshot` uses. It takes pixelmatch's `customDiffConfig` options, such as `threshold`, `includeAA`, `alpha` and `diffColor`, and draws the same kind of diff image.
@@ -161,7 +169,7 @@ Known differences:
 - The matcher accepts `runInProcess` and `maxChildProcessBufferSizeInBytes` but ignores them, since there is no child process.
 - A corrupted PNG throws in both packages, but the error message comes from libpng instead of pngjs, for example `vipspng: libpng read error` instead of `Unrecognised filter type - 104`.
 - This package encodes diff images differently, so their bytes differ from jest-image-snapshot's, but their pixels are identical.
-- `comparisonMethod: 'blazediff'` and `waitForStableScreenshot` are new in this package. jest-image-snapshot treats any `comparisonMethod` other than `'ssim'` as pixelmatch.
+- `comparisonMethod: 'blazediff'`, `diffCompressionLevel` and `waitForStableScreenshot` are new in this package. jest-image-snapshot treats any `comparisonMethod` other than `'ssim'` as pixelmatch and ignores unknown options.
 - pixelmatch stays pinned to 5.x, the version jest-image-snapshot uses. pixelmatch 7 and 8 changed how they count differing pixels, which would flip existing thresholds.
 
 ## Development

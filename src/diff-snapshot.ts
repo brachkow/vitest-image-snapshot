@@ -177,6 +177,7 @@ export const diffImageToSnapshot = async (options: DiffOptions): Promise<DiffRes
     diffDirectory,
     diffDirection = 'horizontal',
     onlyDiff = false,
+    diffCompressionLevel = 1,
     updateSnapshot = false,
     updatePassedSnapshot = false,
     customDiffConfig = {},
@@ -260,7 +261,7 @@ export const diffImageToSnapshot = async (options: DiffOptions): Promise<DiffRes
       result = { receivedSnapshotPath }
     }
     const panels = onlyDiff ? [diff] : [baseline, diff, received]
-    const pngBuffer = await encodePng(composeImages(panels, diffDirection))
+    const pngBuffer = await encodePng(composeImages(panels, diffDirection), diffCompressionLevel)
     writeFileWithHooks({ pathToFile: diffOutputPath, content: pngBuffer, ...writeContext })
     return {
       ...result,
