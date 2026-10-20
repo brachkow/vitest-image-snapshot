@@ -7,6 +7,19 @@ const REPEATS = 3
 // Stops repeating a case once one call is this slow, so the bench finishes in minutes
 const SLOW_CALL_MS = 5000
 
+const SNAPSHOT_MISMATCH = /different from snapshot|same size as the snapshot/
+
+// A snapshot mismatch is the point of the failing case, anything else is a broken run
+const matchAllowingMismatch = (expect, image, options) => {
+  try {
+    expect(image).toMatchImageSnapshot(options)
+  } catch (error) {
+    if (!SNAPSHOT_MISMATCH.test(error.message)) {
+      throw error
+    }
+  }
+}
+
 // createMatcher comes from each runner's project, so every runner loads its native build
 const runBench = ({ expect, implementation, createMatcher }) => {
   const fixtures = process.env.BENCH_FIXTURES
@@ -26,11 +39,7 @@ const runBench = ({ expect, implementation, createMatcher }) => {
       const times = []
       for (let index = 0; index < REPEATS; index++) {
         const start = performance.now()
-        try {
-          expect(image).toMatchImageSnapshot(options)
-        } catch {
-          // Failing cases are the point of the measurement
-        }
+        matchAllowingMismatch(expect, image, options)
         times.push(performance.now() - start)
         if (times.at(-1) > SLOW_CALL_MS) {
           break

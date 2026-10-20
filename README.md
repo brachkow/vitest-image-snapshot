@@ -84,7 +84,11 @@ This package changes the following:
 
 ## Benchmark
 
-Time per `toMatchImageSnapshot` call, on an Apple M1 Pro with Node 24, Jest 30.5 and Vitest 5.0. The images are generated screenshots with flat blocks and text-like rows. Each case is the fastest of 3 calls. The code is in [`bench/`](bench), and `pnpm bench` reproduces the tables.
+There are two benchmarks in [`bench/`](bench).
+
+`pnpm bench` times `toMatchImageSnapshot` for the current source, the latest npm release and jest-image-snapshot in one process. The current source and the release run in alternating rounds, so changes in machine load affect both, and the result is the median of their per-round ratios. On identical code those ratios stayed between 0.87x and 1.25x, even on a heavily loaded laptop. CI runs it on every push and pull request, adds the table to the job summary, and fails when the current source is more than 1.5 times slower than the release on any case that takes over 1 ms.
+
+`pnpm bench:runners` produces the tables below. It runs each implementation inside real Jest and Vitest processes, on an Apple M1 Pro with Node 24, Jest 30.5 and Vitest 5.0. The images are generated screenshots with flat blocks and text-like rows. Each case is the fastest of 3 calls. These tables were measured on 0.1.0, before identical pixels skipped pixelmatch.
 
 ### Jest
 
@@ -126,6 +130,7 @@ Three kinds of tests check that this package behaves like jest-image-snapshot 6.
 
 Known differences:
 
+- A large failing screenshot, such as the benchmark's 1280×8000 page, can make jest-image-snapshot throw `spawnSync ... ENOBUFS` with its default settings. Its child process returns the diff image as base64, which can exceed the default 10 MB `maxChildProcessBufferSizeInBytes`. This package reports the failure normally.
 - `runInProcess` and `maxChildProcessBufferSizeInBytes` are accepted but do nothing, since there is no child process.
 - A corrupted PNG throws in both packages, but the error message comes from libpng instead of pngjs, for example `vipspng: libpng read error` instead of `Unrecognised filter type - 104`.
 - Diff images are encoded differently, so their bytes differ from jest-image-snapshot's, but their pixels are identical.
@@ -139,7 +144,8 @@ pnpm test            # unit, side-by-side and integration tests
 pnpm test:original   # jest-image-snapshot's own spec against this package
 pnpm lint
 pnpm typecheck
-pnpm bench           # benchmark tables from the README
+pnpm bench           # current source vs the latest release and jest-image-snapshot
+pnpm bench:runners   # benchmark tables from the README, in real Jest and Vitest runs
 ```
 
 Integration tests can target another runner version: install it with `pnpm --dir test/runners/vitest-3 install`, then run `pnpm vitest run test/integration.test.ts` with `INTEGRATION_RUNNERS=vitest` and `VITEST_MODULES` (or `JEST_MODULES`) pointing at that directory's `node_modules`.

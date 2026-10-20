@@ -49,6 +49,29 @@ jobs:
       # jest-image-snapshot's own integration spec, run against this package
       - run: pnpm test:original
 
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
+      - run: pnpm install --frozen-lockfile
+      # Interleaved comparison against the latest npm release, same machine and process.
+      # Identical code measured between 0.87x and 1.25x locally under heavy load.
+      - name: Benchmark against the latest release
+        run: pnpm bench
+        env:
+          BENCH_MAX_REGRESSION: '1.5'
+          BENCH_REPORT: ${{ runner.temp }}/bench.md
+      - name: Add the benchmark table to the job summary
+        if: ${{ !cancelled() }}
+        run: |
+          if [ -f "$RUNNER_TEMP/bench.md" ]; then
+            cat "$RUNNER_TEMP/bench.md" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   runners:
     name: ${{ matrix.runner }} ${{ matrix.major }}
     strategy:

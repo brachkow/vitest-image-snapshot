@@ -62,7 +62,8 @@
     "test": "vitest run",
     "test:original": "tsdown && cd test/original && jest --config jest.config.cjs --ci=false",
     "typecheck": "tsc --noEmit",
-    "bench": "tsdown && node bench/run.ts",
+    "bench": "vitest bench --run",
+    "bench:runners": "tsdown && node bench/run.ts",
     "lint": "eslint ."
   },
   "peerDependencies": {
@@ -103,6 +104,7 @@
     "rimraf": "^5.0.10",
     "tsdown": "^0.23.1",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
-    "vitest": "^5.0.5"
+    "vitest": "^5.0.5",
+    "vitest-image-snapshot-released": "npm:@brachkow/vitest-image-snapshot@0.1.0"
   }
 }

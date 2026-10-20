@@ -4,3 +4,7 @@ allowBuilds:
   '@parcel/watcher': false
   esbuild: false
   unrs-resolver: false
+# The benchmark compares against this package's own latest release, which is
+# installed right after publishing, before pnpm's minimum release age has passed
+minimumReleaseAgeExclude:
+  - '@brachkow/vitest-image-snapshot'

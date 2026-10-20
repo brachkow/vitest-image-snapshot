@@ -1,63 +1,20 @@
-// Compares jest-image-snapshot with this package under real Jest and Vitest runs.
-// Usage: pnpm build && node bench/run.ts
-import { Buffer } from 'node:buffer'
+// Compares jest-image-snapshot with this package under real Jest and Vitest runs,
+// which produces the README tables. Usage: pnpm bench:runners
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import sharp from 'sharp'
+import { createScreenshots, SIZES } from './screenshots.ts'
+import type { Size } from './screenshots.ts'
 
 const root = path.join(import.meta.dirname, '..')
 
-const SIZES = { '1280x800': [1280, 800], '2560x1600': [2560, 1600], '1280x8000': [1280, 8000] } as const
-
-// Flat UI blocks with noisy "text" rows, so PNG compression behaves like a real screenshot
-const drawScreenshot = (width: number, height: number, changed: boolean): Buffer => {
-  const data = Buffer.alloc(width * height * 4)
-  let seed = 42
-  // Linear congruential generator, so every run draws the same screenshot
-  const random = () => (seed = (seed * 1_664_525 + 1_013_904_223) % 2 ** 32) / 2 ** 32
-  for (let y = 0; y < height; y++) {
-    const block = Math.floor(y / 120)
-    const isTextRow = y % 120 > 20 && y % 120 < 90 && y % 6 < 4
-    for (let x = 0; x < width; x++) {
-      const index = (width * y + x) * 4
-      const isInk = isTextRow && x > 40 && x < width - 200 && random() < 0.35
-      const value = isInk ? 30 : 240 - (block % 4) * 20
-      data[index] = value
-      data[index + 1] = value
-      data[index + 2] = value + (block % 3) * 5
-      data[index + 3] = 255
-    }
-  }
-  if (changed) {
-    // A 200x40 button that changed color
-    for (let y = 300; y < 340; y++) {
-      for (let x = 100; x < 300; x++) {
-        const index = (width * y + x) * 4
-        data[index] = 220
-        data[index + 1] = 40
-        data[index + 2] = 40
-      }
-    }
-  }
-  return data
-}
-
 const writeFixtures = async (directory: string) => {
-  for (const [name, [width, height]] of Object.entries(SIZES)) {
-    const raw = { raw: { width, height, channels: 4 as const } }
-    const original = drawScreenshot(width, height, false)
-    await sharp(original, raw)
-      .png()
-      .toFile(path.join(directory, `${name}.png`))
-    // Same pixels, different bytes: forces decoding instead of the identical-bytes check
-    await sharp(original, raw)
-      .png({ compressionLevel: 1, adaptiveFiltering: true })
-      .toFile(path.join(directory, `${name}-reencoded.png`))
-    await sharp(drawScreenshot(width, height, true), raw)
-      .png()
-      .toFile(path.join(directory, `${name}-changed.png`))
+  for (const size of Object.keys(SIZES) as Size[]) {
+    const { original, reencoded, changed } = await createScreenshots(size)
+    fs.writeFileSync(path.join(directory, `${size}.png`), original)
+    fs.writeFileSync(path.join(directory, `${size}-reencoded.png`), reencoded)
+    fs.writeFileSync(path.join(directory, `${size}-changed.png`), changed)
   }
 }
 
