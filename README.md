@@ -77,6 +77,7 @@ Profiling jest-image-snapshot showed three costs:
 This package changes the following:
 
 - If the screenshot is byte-identical to the baseline, it passes without decoding anything. In a passing CI run this is the usual case, and it takes under 1 ms.
+- If the bytes differ but the decoded pixels are identical, for example after a screenshot tool update re-encodes the same image, it passes without running pixelmatch. That is about 3 times faster on a full-page screenshot than comparing.
 - Otherwise the comparison runs in one worker thread per test file. The test thread calls it synchronously through [synckit](https://github.com/un-ts/synckit). The worker is plain Node, so Jest's sandbox doesn't slow it down. Starting the worker costs about 100 ms once per test file, and only if a check in that file needs decoding.
 - sharp decodes and encodes PNGs natively. Decoding a 1280×8000 screenshot takes 30 to 50 ms instead of 160 ms.
 - Diff images are written with zlib level 1, which is 4 to 5 times faster than the default level. The files are about 20% larger than jest-image-snapshot's.

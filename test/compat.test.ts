@@ -94,6 +94,21 @@ const scenarios: Record<string, DocumentedScenario> = {
     steps: [{ received: base }, { received: base }],
     outcomes: ['added', 'error'],
   },
+  'fails identical pixels under a negative threshold, writing the diff image': {
+    commonOptions: { failureThreshold: -1 },
+    steps: [{ received: base }, { received: reencodedBase }],
+    outcomes: ['added', 'fail'],
+  },
+  'fails identical pixels under a negative threshold with SSIM': {
+    commonOptions: { comparisonMethod: 'ssim', failureThreshold: -1 },
+    steps: [{ received: base }, { received: reencodedBase }],
+    outcomes: ['added', 'fail'],
+  },
+  'passes identical pixels with blur': {
+    commonOptions: { blur: 2 },
+    steps: [{ received: base }, { received: reencodedBase }],
+    outcomes: ['added', 'pass'],
+  },
   'fails on a size mismatch': { steps: [{ received: base }, { received: larger }], outcomes: ['added', 'fail'] },
   'checks the threshold on a size mismatch when allowSizeMismatch is set': {
     commonOptions: { allowSizeMismatch: true },

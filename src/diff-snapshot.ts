@@ -199,22 +199,35 @@ export const diffImageToSnapshot = async (options: DiffOptions): Promise<DiffRes
     : [rawReceived, rawBaseline]
   const { width, height } = received
 
-  if (typeof blur === 'number' && blur > 0) {
-    blurRGBA(received.data, width, height, blur)
-    blurRGBA(baseline.data, width, height, blur)
+  const evaluate = (diffPixelCount: number) =>
+    shouldFail({
+      totalPixels: width * height,
+      diffPixelCount,
+      hasSizeMismatch,
+      allowSizeMismatch,
+      failureThresholdType,
+      failureThreshold,
+    })
+
+  // Identical pixels count as 0 differences for pixelmatch and SSIM alike, with or without
+  // blur, so blurring and comparing can be skipped. Comparing the raw buffers of a 1280x8000
+  // screenshot takes about 1.4 ms, pixelmatch about 50 ms. Only a negative failureThreshold
+  // fails at 0 differences, and that path still needs the real comparison for its diff image.
+  const identicalPixels = !hasSizeMismatch && received.data.equals(baseline.data)
+  const skipComparison = identicalPixels && evaluate(0).pass
+
+  // The diff image is only read on failure, which a skipped comparison never reaches
+  const diff = skipComparison ? createImage(0, 0) : createImage(width, height)
+  let diffPixelCount = 0
+  if (!skipComparison) {
+    if (typeof blur === 'number' && blur > 0) {
+      blurRGBA(received.data, width, height, blur)
+      blurRGBA(baseline.data, width, height, blur)
+    }
+    diffPixelCount = compare(comparisonMethod, received, baseline, diff, customDiffConfig)
   }
 
-  const diff = createImage(width, height)
-  const diffPixelCount = compare(comparisonMethod, received, baseline, diff, customDiffConfig)
-
-  const { pass, diffSize, diffRatio } = shouldFail({
-    totalPixels: width * height,
-    diffPixelCount,
-    hasSizeMismatch,
-    allowSizeMismatch,
-    failureThresholdType,
-    failureThreshold,
-  })
+  const { pass, diffSize, diffRatio } = evaluate(diffPixelCount)
 
   if (!pass && !updateSnapshot) {
     let result: DiffResult = {}
