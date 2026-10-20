@@ -14,6 +14,8 @@ import { runDiffImageToSnapshot } from './run-diff.ts'
 import type { CustomSnapshotIdentifierParams, DiffResult, MatchImageSnapshotOptions } from './types.ts'
 
 export type * from './types.ts'
+export { waitForStableScreenshot } from './stable-screenshot.ts'
+export type { StableScreenshotOptions } from './stable-screenshot.ts'
 
 const SNAPSHOTS_DIR = '__image_snapshots__'
 

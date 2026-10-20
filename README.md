@@ -36,6 +36,19 @@ expect.extend({ toMatchImageSnapshot })
 
 The matcher is synchronous, so no `await` is needed, same as before. Every jest-image-snapshot option works: `failureThreshold`, `failureThresholdType`, `customDiffConfig`, `comparisonMethod: 'ssim'`, `blur`, `allowSizeMismatch`, `customSnapshotIdentifier`, `customSnapshotsDir`, `customDiffDir`, `storeReceivedOnFailure`, `runtimeHooksPath`, `dumpDiffToConsole` and the rest. See the [jest-image-snapshot option list](https://github.com/americanexpress/jest-image-snapshot#optional-configuration).
 
+### Waiting for a stable screenshot
+
+`waitForStableScreenshot` captures until two screenshots in a row are byte-identical and returns the last one. A late font, image or CSS transition then costs a retry instead of a flaky failure. Vitest's `toMatchScreenshot` checks stability the same way before it compares.
+
+```js
+import { waitForStableScreenshot } from '@brachkow/vitest-image-snapshot'
+
+const image = await waitForStableScreenshot(() => page.screenshot({ fullPage: true }))
+expect(image).toMatchImageSnapshot()
+```
+
+It throws if the screenshot still changes after `timeout` milliseconds, 5000 by default: `waitForStableScreenshot(capture, { timeout: 10000 })`.
+
 ### Counting like Vitest's toMatchScreenshot
 
 `comparisonMethod: 'blazediff'` compares with [`@blazediff/core`](https://github.com/teimurjan/blazediff), the library Vitest 5's built-in `toMatchScreenshot` uses. It takes pixelmatch's `customDiffConfig` options, such as `threshold`, `includeAA`, `alpha` and `diffColor`, and draws the same kind of diff image.
@@ -150,7 +163,7 @@ Known differences:
 - The matcher accepts `runInProcess` and `maxChildProcessBufferSizeInBytes` but ignores them, since there is no child process.
 - A corrupted PNG throws in both packages, but the error message comes from libpng instead of pngjs, for example `vipspng: libpng read error` instead of `Unrecognised filter type - 104`.
 - This package encodes diff images differently, so their bytes differ from jest-image-snapshot's, but their pixels are identical.
-- `comparisonMethod: 'blazediff'` is new in this package. jest-image-snapshot treats any value other than `'ssim'` as pixelmatch.
+- `comparisonMethod: 'blazediff'` and `waitForStableScreenshot` are new in this package. jest-image-snapshot treats any `comparisonMethod` other than `'ssim'` as pixelmatch.
 - pixelmatch stays pinned to 5.x, the version jest-image-snapshot uses. pixelmatch 7 and 8 changed how they count differing pixels, which would flip existing thresholds.
 
 ## Development
