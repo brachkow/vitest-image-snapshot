@@ -36,6 +36,22 @@ expect.extend({ toMatchImageSnapshot })
 
 The matcher is synchronous, so no `await` is needed, same as before. Every jest-image-snapshot option works: `failureThreshold`, `failureThresholdType`, `customDiffConfig`, `comparisonMethod: 'ssim'`, `blur`, `allowSizeMismatch`, `customSnapshotIdentifier`, `customSnapshotsDir`, `customDiffDir`, `storeReceivedOnFailure`, `runtimeHooksPath`, `dumpDiffToConsole` and the rest. See the [jest-image-snapshot option list](https://github.com/americanexpress/jest-image-snapshot#optional-configuration).
 
+### Counting like Vitest's toMatchScreenshot
+
+`comparisonMethod: 'blazediff'` compares with [`@blazediff/core`](https://github.com/teimurjan/blazediff), the engine behind Vitest 5's built-in `toMatchScreenshot`. It takes the same `customDiffConfig` options as pixelmatch (`threshold`, `includeAA`, `alpha`, `diffColor` and the rest) and draws the same kind of diff image.
+
+```js
+expect(image).toMatchImageSnapshot({
+  comparisonMethod: 'blazediff',
+  // Vitest's default. Without it, this package's default of 0.01 applies.
+  customDiffConfig: { threshold: 0.1 },
+})
+```
+
+With `threshold: 0.1`, it counts differing pixels exactly as Vitest's `toMatchScreenshot` does for the same pixels. Whether a check passes is still decided by `failureThreshold` and `failureThresholdType`, not by Vitest's `allowedMismatchedPixels` options. In the benchmark, a failing check was 7 to 12% faster than with pixelmatch, and identical images took the same time.
+
+It is opt-in because its counts differ slightly from pixelmatch's, which jest-image-snapshot uses. On jest-image-snapshot's own test images it counts 8,625 differing pixels where pixelmatch counts 8,645, and 0 where pixelmatch counts 1 for a one-pixel change. Switching an existing suite can flip results that sit right at the threshold.
+
 ### TypeScript
 
 Jest projects that use `@types/jest-image-snapshot` keep working, because those types extend Jest's global `jest.Matchers`. For Vitest 5, add this to a `.d.ts` file in your project:
@@ -134,6 +150,7 @@ Known differences:
 - `runInProcess` and `maxChildProcessBufferSizeInBytes` are accepted but do nothing, since there is no child process.
 - A corrupted PNG throws in both packages, but the error message comes from libpng instead of pngjs, for example `vipspng: libpng read error` instead of `Unrecognised filter type - 104`.
 - Diff images are encoded differently, so their bytes differ from jest-image-snapshot's, but their pixels are identical.
+- `comparisonMethod: 'blazediff'` is new in this package. jest-image-snapshot treats any value other than `'ssim'` as pixelmatch.
 - pixelmatch stays pinned to 5.x, the version jest-image-snapshot uses. pixelmatch 7 and 8 changed how they count differing pixels, which would flip existing thresholds.
 
 ## Development

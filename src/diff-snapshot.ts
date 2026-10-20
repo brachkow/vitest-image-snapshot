@@ -9,6 +9,7 @@ import { Buffer } from 'node:buffer'
 import fs from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
+import { diff as blazediff } from '@blazediff/core'
 import { blurRGBA } from 'glur'
 import pixelmatch from 'pixelmatch'
 import { ssim } from 'ssim.js'
@@ -16,7 +17,7 @@ import type { Options as SsimOptions } from 'ssim.js'
 import { alignImagesToSameSize, composeImages, createImage, decodePng, encodePng } from './image.ts'
 import type { RawImage } from './image.ts'
 import { snapshotPaths, validateFailureThresholdType } from './snapshot-paths.ts'
-import type { CustomDiffConfig, DiffOptions, DiffResult, FailureThresholdType } from './types.ts'
+import type { ComparisonMethod, CustomDiffConfig, DiffOptions, DiffResult, FailureThresholdType } from './types.ts'
 
 const require = createRequire(import.meta.url)
 
@@ -127,6 +128,29 @@ const writeFileWithHooks = ({ pathToFile, content, runtimeHooksPath, testPath, c
   fs.writeFileSync(pathToFile, finalContent)
 }
 
+type Comparator = (received: RawImage, baseline: RawImage, diff: RawImage, customDiffConfig: CustomDiffConfig) => number
+
+const COMPARATORS: Record<ComparisonMethod, Comparator> = {
+  pixelmatch: (received, baseline, diff, customDiffConfig) =>
+    pixelmatch(received.data, baseline.data, diff.data, received.width, received.height, {
+      ...DEFAULT_PIXELMATCH_DIFF_CONFIG,
+      ...customDiffConfig,
+    }),
+  ssim: (received, baseline, diff, customDiffConfig) =>
+    ssimMatch(received.data, baseline.data, diff.data, received.width, received.height, {
+      ...DEFAULT_SSIM_DIFF_CONFIG,
+      ...customDiffConfig,
+    }),
+  // The engine behind Vitest's toMatchScreenshot. Its options and diff output follow
+  // pixelmatch's, but its counts differ slightly, so it is opt-in. The threshold
+  // default stays at this package's 0.01, Vitest's own default is 0.1.
+  blazediff: (received, baseline, diff, customDiffConfig) =>
+    blazediff(received.data, baseline.data, diff.data, received.width, received.height, {
+      ...DEFAULT_PIXELMATCH_DIFF_CONFIG,
+      ...customDiffConfig,
+    }),
+}
+
 const compare = (
   comparisonMethod: string,
   received: RawImage,
@@ -134,12 +158,9 @@ const compare = (
   diff: RawImage,
   customDiffConfig: CustomDiffConfig,
 ): number => {
-  if (comparisonMethod === 'ssim') {
-    const config = { ...DEFAULT_SSIM_DIFF_CONFIG, ...customDiffConfig } as Partial<SsimOptions>
-    return ssimMatch(received.data, baseline.data, diff.data, received.width, received.height, config)
-  }
-  const config = { ...DEFAULT_PIXELMATCH_DIFF_CONFIG, ...customDiffConfig }
-  return pixelmatch(received.data, baseline.data, diff.data, received.width, received.height, config)
+  // jest-image-snapshot treats any value other than 'ssim' as pixelmatch
+  const comparator = COMPARATORS[comparisonMethod as ComparisonMethod] ?? COMPARATORS.pixelmatch
+  return comparator(received, baseline, diff, customDiffConfig)
 }
 
 export const diffImageToSnapshot = async (options: DiffOptions): Promise<DiffResult> => {

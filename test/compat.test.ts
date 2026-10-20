@@ -160,6 +160,11 @@ const scenarios: Record<string, DocumentedScenario> = {
     steps: [{ received: base }, { received: reencodedBase }],
     outcomes: ['added', 'pass'],
   },
+  'treats an unknown comparisonMethod as pixelmatch': {
+    commonOptions: { comparisonMethod: 'pixelmatch-ish' as 'pixelmatch' },
+    steps: [{ received: base }, { received: changed }],
+    outcomes: ['added', 'fail'],
+  },
   'compares with the SSIM fast preset': {
     commonOptions: { comparisonMethod: 'ssim', customDiffConfig: { ssim: 'fast' } },
     steps: [{ received: base }, { received: changed }],

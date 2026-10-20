@@ -1,13 +1,14 @@
 import { Buffer } from 'node:buffer'
+import type { CoreOptions as BlazediffOptions } from '@blazediff/core'
 import type { PixelmatchOptions } from 'pixelmatch'
 import type { Options as SsimOptions } from 'ssim.js'
 import type { DiffDirection } from './image.ts'
 
 export type FailureThresholdType = 'pixel' | 'percent'
 
-export type ComparisonMethod = 'pixelmatch' | 'ssim'
+export type ComparisonMethod = 'pixelmatch' | 'ssim' | 'blazediff'
 
-export type CustomDiffConfig = PixelmatchOptions | Partial<SsimOptions>
+export type CustomDiffConfig = PixelmatchOptions | Partial<SsimOptions> | BlazediffOptions
 
 export interface CustomSnapshotIdentifierParams {
   testPath: string

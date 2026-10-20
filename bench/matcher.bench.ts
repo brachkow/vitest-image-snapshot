@@ -22,6 +22,9 @@ import type { Screenshots, Size } from './screenshots.ts'
 
 const IMPLEMENTATIONS = {
   current: configureCurrent,
+  // Not gated, shows what the opt-in comparison method costs next to pixelmatch
+  'current (blazediff)': (options: MatchImageSnapshotOptions) =>
+    configureCurrent({ ...options, comparisonMethod: 'blazediff' }),
   released: configureReleased,
   // The default 10 MB child process buffer is too small for a full-page diff, which
   // makes jest-image-snapshot throw ENOBUFS instead of reporting the failure
@@ -127,20 +130,29 @@ const formatRow = (cells: string[]) => `| ${cells.join(' | ')} |`
 
 const formatReport = (reportRows: Row[]) =>
   [
-    formatRow(['Case', 'Size', 'current', 'released', 'jest-image-snapshot', 'current / released']),
-    formatRow(Array.from<string>({ length: 6 }).fill('---')),
+    formatRow([
+      'Case',
+      'Size',
+      'current',
+      'current (blazediff)',
+      'released',
+      'jest-image-snapshot',
+      'current / released',
+    ]),
+    formatRow(Array.from<string>({ length: 7 }).fill('---')),
     ...reportRows.map(({ size, case: name, medians, ratio }) =>
       formatRow([
         name,
         size,
         formatMs(medians.current),
+        formatMs(medians['current (blazediff)']),
         formatMs(medians.released),
         formatMs(medians['jest-image-snapshot']),
         `${ratio.toFixed(2)}x`,
       ]),
     ),
     '',
-    `Median time per toMatchImageSnapshot call. current and released: ${GATED_ROUNDS} interleaved rounds, the last column is the median of their per-round ratios. jest-image-snapshot: ${REFERENCE_ROUNDS} calls.`,
+    `Median time per toMatchImageSnapshot call. current, current (blazediff) and released: ${GATED_ROUNDS} interleaved rounds, the last column is the median of their per-round ratios. jest-image-snapshot: ${REFERENCE_ROUNDS} calls.`,
     '',
   ].join('\n')
 
@@ -156,21 +168,24 @@ describe.each(BENCH_SIZES)('%s', (size) => {
         ]),
       ) as Record<Implementation, (image: Buffer) => unknown>
 
+      const interleaved = ['current', 'current (blazediff)', 'released'] as const
       for (let round = 0; round < WARMUP_ROUNDS; round++) {
-        run.current(image)
-        run.released(image)
+        for (const implementation of interleaved) {
+          run[implementation](image)
+        }
       }
-      const times = { current: [] as number[], released: [] as number[] }
+      const times = { current: [] as number[], 'current (blazediff)': [] as number[], released: [] as number[] }
       const ratios: number[] = []
       for (let round = 0; round < GATED_ROUNDS; round++) {
-        // Alternate which one goes first, so neither always runs right after the other
-        const order = round % 2 === 0 ? (['current', 'released'] as const) : (['released', 'current'] as const)
-        const roundTimes = { current: 0, released: 0 }
+        // Rotate the starting implementation, so none always runs right after another
+        const order = interleaved.map((_name, index) => interleaved[(index + round) % interleaved.length])
+        const roundTimes = { current: 0, 'current (blazediff)': 0, released: 0 }
         for (const implementation of order) {
           roundTimes[implementation] = timeCall(() => run[implementation](image))
         }
-        times.current.push(roundTimes.current)
-        times.released.push(roundTimes.released)
+        for (const implementation of interleaved) {
+          times[implementation].push(roundTimes[implementation])
+        }
         ratios.push(roundTimes.current / roundTimes.released)
       }
       const referenceTimes = Array.from({ length: REFERENCE_ROUNDS }, () =>
@@ -179,6 +194,7 @@ describe.each(BENCH_SIZES)('%s', (size) => {
 
       const medians = {
         current: median(times.current),
+        'current (blazediff)': median(times['current (blazediff)']),
         released: median(times.released),
         'jest-image-snapshot': median(referenceTimes),
       }

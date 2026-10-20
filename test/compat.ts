@@ -123,7 +123,7 @@ const stepOutcome = (pass: boolean, before: Counters, after: Counters): Outcome 
   return 'pass'
 }
 
-const runScenario = (implementation: Implementation, scenario: Scenario) =>
+export const runScenario = (implementation: Implementation, scenario: Scenario) =>
   withEnvironment(scenario, () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'image-snapshot-compat-'))
     try {
