@@ -39,7 +39,10 @@ export interface MatcherContext {
   testPath?: string
   currentTestName?: string
   isNot?: boolean
-  snapshotState: SnapshotState
+  // Jest and Vitest declare _counters and _updateSnapshot as private class members, and TypeScript
+  // never treats a class with private members as assignable to an interface with public ones.
+  // Typing this as SnapshotState would make expect.extend({ toMatchImageSnapshot }) fail to compile
+  snapshotState: object
 }
 
 export interface MatcherResult {
@@ -235,7 +238,8 @@ export const configureToMatchImageSnapshot = ({
       comparisonMethod = commonComparisonMethod,
     }: MatchImageSnapshotOptions = {},
   ): MatcherResult {
-    const { testPath = '', currentTestName = '', isNot, snapshotState } = this
+    const { testPath = '', currentTestName = '', isNot } = this
+    const snapshotState = this.snapshotState as SnapshotState
     const paint = createPaint(noColors)
     const retryTimes = readRetryTimes()
 

@@ -101,7 +101,8 @@ const createMatcher = (implementation: Implementation, size: Size) => {
     customSnapshotIdentifier: size,
     noColors: true,
   })
-  const context: MatcherContext = {
+  // The released matcher still types snapshotState as SnapshotState, so keep the concrete type
+  const context: MatcherContext & { snapshotState: SnapshotState } = {
     testPath: path.join(directory, 'matcher.bench.ts'),
     currentTestName: size,
     isNot: false,
