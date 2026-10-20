@@ -23,6 +23,10 @@ const require = createRequire(import.meta.url)
 
 const DEFAULT_PIXELMATCH_DIFF_CONFIG = { threshold: 0.01 }
 
+// Vitest's toMatchScreenshot defaults. blazediff is opt-in and new in this package, so it
+// can follow Vitest instead of pixelmatch's 0.01, which made "counting like Vitest" need extra config
+const DEFAULT_BLAZEDIFF_DIFF_CONFIG = { threshold: 0.1 }
+
 // Bezkrovny downsamples before comparing, which is about 9x faster than the 'fast' SSIM preset
 const DEFAULT_SSIM_DIFF_CONFIG: Partial<SsimOptions> = { ssim: 'bezkrovny' }
 
@@ -142,11 +146,10 @@ const COMPARATORS: Record<ComparisonMethod, Comparator> = {
       ...customDiffConfig,
     }),
   // The engine behind Vitest's toMatchScreenshot. Its options and diff output follow
-  // pixelmatch's, but its counts differ slightly, so it is opt-in. The threshold
-  // default stays at this package's 0.01, Vitest's own default is 0.1.
+  // pixelmatch's, but its counts differ slightly, so it is opt-in.
   blazediff: (received, baseline, diff, customDiffConfig) =>
     blazediff(received.data, baseline.data, diff.data, received.width, received.height, {
-      ...DEFAULT_PIXELMATCH_DIFF_CONFIG,
+      ...DEFAULT_BLAZEDIFF_DIFF_CONFIG,
       ...customDiffConfig,
     }),
 }

@@ -56,7 +56,7 @@ describe("comparisonMethod: 'blazediff'", () => {
 
     // Assert
     expect(outcome).toBe('fail')
-    expect(count).toBe(countDirectly(blazediff, baseline, received, { threshold: 0.01 }))
+    expect(count).toBe(countDirectly(blazediff, baseline, received, VITEST_COMPARATOR_DEFAULTS))
   })
 
   test('counts differently from pixelmatch on anti-aliased edges, which is why it is opt-in', () => {
@@ -65,7 +65,7 @@ describe("comparisonMethod: 'blazediff'", () => {
     const received = stub('TestImageFailure.png')
 
     // Act
-    const { count } = compareWithMatcher(baseline, received, {})
+    const { count } = compareWithMatcher(baseline, received, { customDiffConfig: { threshold: 0.01 } })
 
     // Assert
     expect(count).toBe(8625)
@@ -78,23 +78,36 @@ describe("comparisonMethod: 'blazediff'", () => {
     const received = stub('TestImageUpdate1pxOff.png')
 
     // Act
-    const { outcome } = compareWithMatcher(baseline, received, {})
+    const { outcome } = compareWithMatcher(baseline, received, { customDiffConfig: { threshold: 0.01 } })
 
     // Assert
     expect(outcome).toBe('pass')
     expect(countDirectly(pixelmatch, baseline, received, { threshold: 0.01 })).toBe(1)
   })
 
-  test("counts like Vitest's toMatchScreenshot with threshold 0.1", () => {
+  test("counts like Vitest's toMatchScreenshot without extra config", () => {
     // Arrange
     const baseline = stub('Desktop 1_082.png')
     const received = stub('Desktop 1_083.png')
 
     // Act
-    const { count } = compareWithMatcher(baseline, received, { customDiffConfig: { threshold: 0.1 } })
+    const { count } = compareWithMatcher(baseline, received, {})
 
     // Assert
     expect(count).toBe(countDirectly(blazediff, baseline, received, VITEST_COMPARATOR_DEFAULTS))
+  })
+
+  test('keeps a threshold set in customDiffConfig over the default', () => {
+    // Arrange
+    const baseline = stub('Desktop 1_082.png')
+    const received = stub('Desktop 1_083.png')
+
+    // Act
+    const { count } = compareWithMatcher(baseline, received, { customDiffConfig: { threshold: 0.01 } })
+
+    // Assert
+    expect(count).toBe(countDirectly(blazediff, baseline, received, { threshold: 0.01 }))
+    expect(count).not.toBe(countDirectly(blazediff, baseline, received, VITEST_COMPARATOR_DEFAULTS))
   })
 
   test('passes includeAA through to blazediff', () => {
@@ -106,7 +119,7 @@ describe("comparisonMethod: 'blazediff'", () => {
     const { count } = compareWithMatcher(baseline, received, { customDiffConfig: { includeAA: true } })
 
     // Assert
-    expect(count).toBe(countDirectly(blazediff, baseline, received, { threshold: 0.01, includeAA: true }))
+    expect(count).toBe(countDirectly(blazediff, baseline, received, { threshold: 0.1, includeAA: true }))
   })
 
   test("puts blazediff's diff output in the middle panel of the diff image", () => {
@@ -115,7 +128,7 @@ describe("comparisonMethod: 'blazediff'", () => {
     const baseline = encodeWithPngjs(pattern, { colorType: 6, bitDepth: 8 })
     const received = encodeWithPngjs(withRectangle(pattern, 5, 12, 6, 4), { colorType: 6, bitDepth: 8 })
     const expectedPanel = new Uint8Array(40 * 30 * 4)
-    blazediff(decode(received).data, decode(baseline).data, expectedPanel, 40, 30, { threshold: 0.01 })
+    blazediff(decode(received).data, decode(baseline).data, expectedPanel, 40, 30, { threshold: 0.1 })
 
     // Act
     const { files } = compareWithMatcher(baseline, received, {})

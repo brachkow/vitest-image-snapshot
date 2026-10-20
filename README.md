@@ -54,16 +54,14 @@ It throws if the screenshot still changes after `timeout` milliseconds, 5000 by 
 `comparisonMethod: 'blazediff'` compares with [`@blazediff/core`](https://github.com/teimurjan/blazediff), the library Vitest 5's built-in `toMatchScreenshot` uses. It takes pixelmatch's `customDiffConfig` options, such as `threshold`, `includeAA`, `alpha` and `diffColor`, and draws the same kind of diff image.
 
 ```js
-expect(image).toMatchImageSnapshot({
-  comparisonMethod: 'blazediff',
-  // Vitest's default. Without it, this package's default of 0.01 applies.
-  customDiffConfig: { threshold: 0.1 },
-})
+expect(image).toMatchImageSnapshot({ comparisonMethod: 'blazediff' })
 ```
 
-With `threshold: 0.1`, it counts differing pixels exactly as Vitest's `toMatchScreenshot` does for the same pixels. `failureThreshold` and `failureThresholdType` still decide whether a check passes. Vitest's `allowedMismatchedPixels` options don't apply. In the benchmark, a failing check was 7 to 12% faster than with pixelmatch, and identical images took the same time.
+It uses Vitest's default `threshold: 0.1`, so it counts differing pixels exactly as Vitest's `toMatchScreenshot` does for the same pixels. Version 0.2.0 used this package's pixelmatch default of 0.01 here, and `customDiffConfig: { threshold: 0.01 }` keeps those counts. `failureThreshold` and `failureThresholdType` still decide whether a check passes. Vitest's `allowedMismatchedPixels` options don't apply. In the benchmark, a failing check was 7 to 12% faster than with pixelmatch, and identical images took the same time.
 
 It is opt-in because its counts differ slightly from pixelmatch's, which jest-image-snapshot uses. On jest-image-snapshot's own test images it counts 8,625 differing pixels where pixelmatch counts 8,645, and 0 where pixelmatch counts 1 for a one-pixel change. Switching an existing suite can change the result of checks whose count is close to the threshold.
+
+Like Vitest, blazediff skips pixels it detects as anti-aliasing. A change to rounded corners or thin borders is mostly anti-aliased pixels, so it can stay under a pixel limit. In one Storybook suite, removing a button's corner radius counted 20 to 41 pixels by default and 692 with `includeAA: true`, while unchanged screenshots counted 39 at most. Set `customDiffConfig: { includeAA: true }` when such changes must fail.
 
 ### TypeScript
 
