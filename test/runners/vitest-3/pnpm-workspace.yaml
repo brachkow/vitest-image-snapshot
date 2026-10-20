@@ -1,0 +1,4 @@
+# Build scripts reviewed for this runner install. They only verify native binaries
+# that already ship as optional dependencies.
+allowBuilds:
+  esbuild: false

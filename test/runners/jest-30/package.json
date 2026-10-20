@@ -1,0 +1,8 @@
+{
+  "name": "jest-30-runner",
+  "private": true,
+  "description": "Pinned jest 30 install for the CI integration matrix",
+  "dependencies": {
+    "jest": "^30.5.2"
+  }
+}

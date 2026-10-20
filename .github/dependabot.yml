@@ -1,0 +1,27 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+
+  # Each runner project pins one major version for the CI matrix, so only
+  # minor and patch releases are picked up there
+  - package-ecosystem: npm
+    directories:
+      - /test/runners/jest-29
+      - /test/runners/jest-30
+      - /test/runners/vitest-3
+      - /test/runners/vitest-4
+      - /test/runners/vitest-5
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+
+  # Actions are pinned to commit SHAs, Dependabot keeps the SHA and version comment current
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A new push to the same branch or pull request cancels the run it supersedes
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+
+  test:
+    name: test (${{ matrix.os }}, node ${{ matrix.node }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: ['22', '24']
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      # Overrides the Node version pinned in mise.toml for this job
+      MISE_NODE_VERSION: ${{ matrix.node }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
+      - run: pnpm install --frozen-lockfile
+      # Unit, side-by-side compatibility and integration tests (Jest 30, Vitest 5)
+      - run: pnpm test
+      # jest-image-snapshot's own integration spec, run against this package
+      - run: pnpm test:original
+
+  runners:
+    name: ${{ matrix.runner }} ${{ matrix.major }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: jest, major: '29' }
+          - { runner: jest, major: '30' }
+          - { runner: vitest, major: '3' }
+          - { runner: vitest, major: '4' }
+          - { runner: vitest, major: '5' }
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
+      - run: pnpm install --frozen-lockfile
+      # Each runner version is its own small project with a committed lockfile
+      - run: pnpm --dir test/runners/${{ matrix.runner }}-${{ matrix.major }} install --frozen-lockfile
+      - name: Integration tests with ${{ matrix.runner }} ${{ matrix.major }}
+        run: pnpm vitest run test/integration.test.ts
+        env:
+          INTEGRATION_RUNNERS: ${{ matrix.runner }}
+          EXPECTED_RUNNER_MAJOR: ${{ matrix.major }}
+          JEST_MODULES: ${{ github.workspace }}/test/runners/${{ matrix.runner }}-${{ matrix.major }}/node_modules
+          VITEST_MODULES: ${{ github.workspace }}/test/runners/${{ matrix.runner }}-${{ matrix.major }}/node_modules

@@ -1,0 +1,8 @@
+{
+  "name": "vitest-4-runner",
+  "private": true,
+  "description": "Pinned vitest 4 install for the CI integration matrix",
+  "dependencies": {
+    "vitest": "^4.1.12"
+  }
+}
