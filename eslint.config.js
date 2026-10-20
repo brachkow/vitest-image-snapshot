@@ -7,7 +7,9 @@ export default defineConfig(
     test: true,
     formatter: 'prettier',
     // Vendored from jest-image-snapshot and kept as close to the original as possible
-    ignores: ['test/original/**'],
+    // test/types/vitest-3.ts only compiles against Vitest 3 and 4, so the root tsconfig, which
+    // type-aware linting needs, leaves it out. test/runners/typecheck.ts compiles it per runner.
+    ignores: ['test/original/**', 'test/types/vitest-3.ts'],
   },
   {
     // Fixture projects executed by a real Jest, which provides its globals

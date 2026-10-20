@@ -20,5 +20,10 @@
     "bench",
     "tsdown.config.ts",
     "vitest.config.ts"
+  ],
+  "exclude": [
+    "test/types/vitest-3.ts",
+    "test/runners/jest-*",
+    "test/runners/vitest-*"
   ]
 }

@@ -95,14 +95,28 @@ Like Vitest, blazediff skips pixels it detects as anti-aliasing. A change to rou
 
 ### TypeScript
 
-Jest projects that use `@types/jest-image-snapshot` keep working, because those types extend Jest's global `jest.Matchers`. For Vitest 5, add this to a `.d.ts` file in your project:
+Jest projects that use `@types/jest-image-snapshot` keep working, because those types extend Jest's global `jest.Matchers`. Vitest needs a declaration in a `.d.ts` file in your project. Vitest 5 and Vitest 3 and 4 declare custom matchers differently, so pick the one for your version.
 
 ```ts
+// Vitest 5
 import type { MatchImageSnapshotOptions } from '@brachkow/vitest-image-snapshot'
 
 declare module 'vitest' {
   interface Matchers<R extends void | Promise<void> = void | Promise<void>, T = unknown> {
     toMatchImageSnapshot: (options?: MatchImageSnapshotOptions) => R
+    toMatchImageSnapshotAsync: (options?: MatchImageSnapshotOptions) => Promise<void>
+  }
+}
+```
+
+```ts
+// Vitest 3 and 4
+import type { MatchImageSnapshotOptions } from '@brachkow/vitest-image-snapshot'
+
+declare module 'vitest' {
+  interface Assertion<T = any> {
+    toMatchImageSnapshot: (options?: MatchImageSnapshotOptions) => void
+    toMatchImageSnapshotAsync: (options?: MatchImageSnapshotOptions) => Promise<void>
   }
 }
 ```
@@ -183,7 +197,7 @@ Three kinds of tests check that this package behaves like jest-image-snapshot 6.
 
 **Side-by-side scenarios.** The Vitest suite runs jest-image-snapshot 6.5.2 and this package on the same inputs, across 54 scenarios. `toMatchImageSnapshotAsync` runs the same scenarios and must match `toMatchImageSnapshot` exactly. It checks that they return the same pass/fail result, message and snapshot counters, write the same files with byte-identical baselines, and produce pixel-identical diff images. The scenarios cover every option, update and CI modes, size mismatches, SSIM, blur, retries, runtime hooks, console dumps and non-PNG input. Decoding matches pngjs byte for byte across PNG color types, 16-bit images, palettes, interlacing, transparency chunks and embedded color profiles.
 
-**Real runners.** Integration tests run real Jest and Vitest processes against the built package. CI runs them on Jest 29 and 30 and Vitest 3, 4 and 5, each installed from its own lockfile in [`test/runners`](test/runners). The full suite also runs on Linux, macOS and Windows with Node 22 and 24.
+**Real runners.** Integration tests run real Jest and Vitest processes against the built package. CI runs them on Jest 29 and 30 and Vitest 3, 4 and 5, each installed from its own lockfile in [`test/runners`](test/runners). For each Vitest version, CI also compiles the TypeScript setup above against that version's own types. The full suite also runs on Linux, macOS and Windows with Node 22 and 24.
 
 Known differences:
 
@@ -206,7 +220,7 @@ pnpm bench           # current source vs the latest release and jest-image-snaps
 pnpm bench:runners   # benchmark tables from the README, in real Jest and Vitest runs
 ```
 
-Integration tests can target another runner version. Install it with `pnpm --dir test/runners/vitest-3 install`, then run `pnpm vitest run test/integration.test.ts` with `INTEGRATION_RUNNERS=vitest` and `VITEST_MODULES` set to that directory's `node_modules`. For a Jest version, set `INTEGRATION_RUNNERS=jest` and `JEST_MODULES` instead.
+Integration tests can target another runner version. Install it with `pnpm --dir test/runners/vitest-3 install`, then run `pnpm vitest run test/integration.test.ts` with `INTEGRATION_RUNNERS=vitest` and `VITEST_MODULES` set to that directory's `node_modules`. For a Jest version, set `INTEGRATION_RUNNERS=jest` and `JEST_MODULES` instead. With the runner installed, `pnpm typecheck:runner vitest-3` compiles the TypeScript setup against its types.
 
 ## License
 

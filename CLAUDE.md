@@ -18,6 +18,7 @@ pnpm vitest run test/compat.test.ts -t "ssim"      # one file, filtered by test 
 pnpm test:original                                 # jest-image-snapshot's own spec, run with Jest
 pnpm lint                                          # eslint-config-fans with Prettier
 pnpm typecheck                                     # tsc --noEmit (TypeScript 7)
+pnpm typecheck:runner vitest-3                     # test/types against one installed runner's Vitest types
 pnpm build                                         # tsdown to dist/
 pnpm bench                                         # current source vs latest release vs jest-image-snapshot
 pnpm bench:runners                                 # README tables, in real Jest and Vitest processes
@@ -46,6 +47,7 @@ Details that keep results identical to the original:
 
 - `test/compat.test.ts` runs every scenario through both this package and the real jest-image-snapshot (`test/reference.ts`) and compares steps, messages, counters and written files. Diff images are compared by pixels, everything else byte for byte. Each scenario declares its expected per-step `outcomes`, which are checked against the original, so a scenario can't pass without testing anything. Each step is a fresh test run unless it sets `sameRun: true`.
 - `test/original/` is jest-image-snapshot's own integration spec, vendored with minimal changes listed in its header. Don't edit it beyond what's needed to run it against this package. `IMAGE_SNAPSHOT_IMPLEMENTATION=original pnpm test:original` runs it against the original to confirm the copy is still valid.
+- `test/types/` holds the README's TypeScript setup. Vitest 5 and Vitest 3/4 need different augmentations, so `test/runners/typecheck.ts` copies the files into a runner's directory, where `vitest` resolves to that runner. A tsconfig `paths` mapping resolves the types but breaks `declare module 'vitest'`.
 - `test/integration.test.ts` copies a fixture project from `test/integration/` into a temp directory, links `node_modules` to the runner under test, and spawns real Jest or Vitest. `JEST_MODULES`, `VITEST_MODULES`, `INTEGRATION_RUNNERS` and `EXPECTED_RUNNER_MAJOR` select another runner version, installed from `test/runners/<runner>-<major>` with its own lockfile. The spawned runner's environment drops `CI` and `GITHUB_ACTIONS`: Jest gets `--ci=false`, but Vitest 3 has no flag to keep writing new snapshots in CI.
 
 ## Benchmark

@@ -62,6 +62,7 @@
     "test": "vitest run",
     "test:original": "tsdown && cd test/original && jest --config jest.config.cjs --ci=false",
     "typecheck": "tsc --noEmit",
+    "typecheck:runner": "node test/runners/typecheck.ts",
     "bench": "vitest bench --run",
     "bench:runners": "tsdown && node bench/run.ts",
     "lint": "eslint ."
