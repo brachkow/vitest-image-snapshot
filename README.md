@@ -1,6 +1,17 @@
 # @brachkow/vitest-image-snapshot
 
-A drop-in replacement for [jest-image-snapshot](https://github.com/americanexpress/jest-image-snapshot) 6.5.2 that works in Vitest and Jest. It produces the same snapshot file names, pass/fail results, pixel counts and failure messages, and is 2 to 9 times faster when images need decoding.
+A drop-in replacement for [jest-image-snapshot](https://github.com/americanexpress/jest-image-snapshot) that just 2 to 9 times faster when images need decoding.
+
+## Features
+
+- Same API, options, snapshot files and failure messages as [jest-image-snapshot](https://github.com/americanexpress/jest-image-snapshot)
+- Works in Vitest 3, 4 and 5 + Jest 29 and 30
+- [Serious speed improvements over jest-image-snapshot in all scenarios](#benchmark)
+- [Optional `blazediff` support, for more speed](#counting-like-vitests-tomatchscreenshot)
+- No `ENOBUFS` errors on large failing screenshots, because there is no child process
+- [`toMatchImageSnapshotAsync`](#async-matcher-for-concurrent-tests) diffs in a worker pool, so `test.concurrent` tests keep running while it works
+- [`waitForStableScreenshot`](#waiting-for-a-stable-screenshot) retries the capture until two screenshots in a row match
+- [TypeScript declarations](#typescript) for Jest and every supported Vitest version, and the [obsolete snapshot reporter](#removing-obsolete-snapshots) for both runners
 
 ## Install
 
@@ -8,7 +19,9 @@ A drop-in replacement for [jest-image-snapshot](https://github.com/americanexpre
 pnpm i -D @brachkow/vitest-image-snapshot
 ```
 
-Requires Node 22.13 or newer. The package decodes and encodes PNGs with [sharp](https://sharp.pixelplumbing.com), which installs a prebuilt native binary for your platform.
+Requires Node 22.13 or newer.
+
+The package decodes and encodes PNGs with [sharp](https://sharp.pixelplumbing.com), which installs a prebuilt native binary for your platform.
 
 ## Usage
 
