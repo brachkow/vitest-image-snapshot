@@ -1,6 +1,6 @@
 # @brachkow/vitest-image-snapshot
 
-A drop-in replacement for [jest-image-snapshot](https://github.com/americanexpress/jest-image-snapshot) that just 2 to 9 times faster when images need decoding.
+A drop-in replacement for [jest-image-snapshot](https://github.com/americanexpress/jest-image-snapshot) that is 2 to 9 times faster when images need decoding.
 
 ## Features
 
