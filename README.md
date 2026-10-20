@@ -8,7 +8,7 @@ A drop-in replacement for [jest-image-snapshot](https://github.com/americanexpre
 pnpm i -D @brachkow/vitest-image-snapshot
 ```
 
-Requires Node 22.13 or newer. PNG work runs on [sharp](https://sharp.pixelplumbing.com), which installs a prebuilt native binary for your platform.
+Requires Node 22.13 or newer. The package decodes and encodes PNGs with [sharp](https://sharp.pixelplumbing.com), which installs a prebuilt native binary for your platform.
 
 ## Usage
 
@@ -38,7 +38,7 @@ The matcher is synchronous, so no `await` is needed, same as before. Every jest-
 
 ### Counting like Vitest's toMatchScreenshot
 
-`comparisonMethod: 'blazediff'` compares with [`@blazediff/core`](https://github.com/teimurjan/blazediff), the engine behind Vitest 5's built-in `toMatchScreenshot`. It takes the same `customDiffConfig` options as pixelmatch (`threshold`, `includeAA`, `alpha`, `diffColor` and the rest) and draws the same kind of diff image.
+`comparisonMethod: 'blazediff'` compares with [`@blazediff/core`](https://github.com/teimurjan/blazediff), the library Vitest 5's built-in `toMatchScreenshot` uses. It takes pixelmatch's `customDiffConfig` options, such as `threshold`, `includeAA`, `alpha` and `diffColor`, and draws the same kind of diff image.
 
 ```js
 expect(image).toMatchImageSnapshot({
@@ -48,9 +48,9 @@ expect(image).toMatchImageSnapshot({
 })
 ```
 
-With `threshold: 0.1`, it counts differing pixels exactly as Vitest's `toMatchScreenshot` does for the same pixels. Whether a check passes is still decided by `failureThreshold` and `failureThresholdType`, not by Vitest's `allowedMismatchedPixels` options. In the benchmark, a failing check was 7 to 12% faster than with pixelmatch, and identical images took the same time.
+With `threshold: 0.1`, it counts differing pixels exactly as Vitest's `toMatchScreenshot` does for the same pixels. `failureThreshold` and `failureThresholdType` still decide whether a check passes. Vitest's `allowedMismatchedPixels` options don't apply. In the benchmark, a failing check was 7 to 12% faster than with pixelmatch, and identical images took the same time.
 
-It is opt-in because its counts differ slightly from pixelmatch's, which jest-image-snapshot uses. On jest-image-snapshot's own test images it counts 8,625 differing pixels where pixelmatch counts 8,645, and 0 where pixelmatch counts 1 for a one-pixel change. Switching an existing suite can flip results that sit right at the threshold.
+It is opt-in because its counts differ slightly from pixelmatch's, which jest-image-snapshot uses. On jest-image-snapshot's own test images it counts 8,625 differing pixels where pixelmatch counts 8,645, and 0 where pixelmatch counts 1 for a one-pixel change. Switching an existing suite can change the result of checks whose count is close to the threshold.
 
 ### TypeScript
 
@@ -86,25 +86,25 @@ export default defineConfig({ test: { reporters: ['default', new OutdatedSnapsho
 
 Profiling jest-image-snapshot showed three costs:
 
-1. About 80% of each check is spent decoding and encoding PNGs with pngjs, which runs in plain JavaScript.
+1. Decoding and encoding PNGs with pngjs, a pure JavaScript library, takes about 80% of each check.
 2. By default every check spawns a new Node process, which adds about 50 ms.
 3. With `runInProcess: true` under Jest, the PNG encoder calls `Math.abs` about 12 million times per diff image. Jest runs modules inside a `vm` context where global lookups are about 240 times slower, so a failing full-page check takes about a minute.
 
 This package changes the following:
 
 - If the screenshot is byte-identical to the baseline, it passes without decoding anything. In a passing CI run this is the usual case, and it takes under 1 ms.
-- If the bytes differ but the decoded pixels are identical, for example after a screenshot tool update re-encodes the same image, it passes without running pixelmatch. That is about 3 times faster on a full-page screenshot than comparing.
+- If the bytes differ but the decoded pixels are identical, for example after a screenshot tool update re-encodes the same image, it passes without running pixelmatch. That makes such a check about 3 times faster on a full-page screenshot.
 - Otherwise the comparison runs in one worker thread per test file. The test thread calls it synchronously through [synckit](https://github.com/un-ts/synckit). The worker is plain Node, so Jest's sandbox doesn't slow it down. Starting the worker costs about 100 ms once per test file, and only if a check in that file needs decoding.
 - sharp decodes and encodes PNGs natively. Decoding a 1280×8000 screenshot takes 30 to 50 ms instead of 160 ms.
-- Diff images are written with zlib level 1, which is 4 to 5 times faster than the default level. The files are about 20% larger than jest-image-snapshot's.
+- The package writes diff images with zlib level 1, which is 4 to 5 times faster than the default level. The files are about 20% larger than jest-image-snapshot's.
 
 ## Benchmark
 
 There are two benchmarks in [`bench/`](bench).
 
-`pnpm bench` times `toMatchImageSnapshot` for the current source, the latest npm release and jest-image-snapshot in one process. The current source and the release run in alternating rounds, so changes in machine load affect both, and the result is the median of their per-round ratios. On identical code those ratios stayed between 0.87x and 1.25x, even on a heavily loaded laptop. CI runs it on every push and pull request, adds the table to the job summary, and fails when the current source is more than 1.5 times slower than the release on any case that takes over 1 ms.
+`pnpm bench` times `toMatchImageSnapshot` for the current source, the latest npm release and jest-image-snapshot in one process. The current source and the release run in alternating rounds, so changes in machine load affect both, and the result is the median of their per-round ratios. On identical code those ratios stayed between 0.87x and 1.25x, even on a heavily loaded laptop. CI runs it on every push and pull request and adds the table to the job summary. The job fails when the current source is more than 1.5 times slower than the release on any case that takes over 1 ms.
 
-`pnpm bench:runners` produces the tables below. It runs each implementation inside real Jest and Vitest processes, on an Apple M1 Pro with Node 24, Jest 30.5 and Vitest 5.0. The images are generated screenshots with flat blocks and text-like rows. Each case is the fastest of 3 calls. These tables were measured on 0.1.0, before identical pixels skipped pixelmatch.
+`pnpm bench:runners` produces the tables below. It runs each implementation inside real Jest and Vitest processes, on an Apple M1 Pro with Node 24, Jest 30.5 and Vitest 5.0. The images are generated screenshots with flat blocks and text-like rows. Each case is the fastest of 3 calls. These tables come from 0.1.0, before identical pixels skipped pixelmatch.
 
 ### Jest
 
@@ -138,7 +138,7 @@ There are two benchmarks in [`bench/`](bench).
 
 Three kinds of tests check that this package behaves like jest-image-snapshot 6.5.2.
 
-**The original test suite.** [`test/original`](test/original) holds jest-image-snapshot's own integration spec, with its stub images and baselines, run against this package with `pnpm test:original`. All 25 tests pass. The same spec also passes against jest-image-snapshot itself (`IMAGE_SNAPSHOT_IMPLEMENTATION=original`), which shows the copy is still a valid test. Three changes were needed, listed at the top of the file: the import, comparing the `onlyDiff` image by pixels instead of PNG bytes, and a fix for a TypedArray test that fails on Node 22 and newer for jest-image-snapshot too. The other original spec files mock internals such as `child_process` and the `diff-snapshot` module, which this package does not have, so they are not included.
+**The original test suite.** [`test/original`](test/original) holds jest-image-snapshot's own integration spec, with its stub images and baselines, run against this package with `pnpm test:original`. All 25 tests pass. Run with `IMAGE_SNAPSHOT_IMPLEMENTATION=original`, the same spec also passes against jest-image-snapshot itself, which shows the copy is still a valid test. The copy has three changes, listed at the top of the file: the import, comparing the `onlyDiff` image by pixels instead of PNG bytes, and a fix for a TypedArray test that fails on Node 22 and newer for jest-image-snapshot too. The other original spec files mock internals that this package doesn't have, such as `child_process` and the `diff-snapshot` module, so this repo leaves them out.
 
 **Side-by-side scenarios.** The Vitest suite runs jest-image-snapshot 6.5.2 and this package on the same inputs, across 54 scenarios. It checks that they return the same pass/fail result, message and snapshot counters, write the same files with byte-identical baselines, and produce pixel-identical diff images. The scenarios cover every option, update and CI modes, size mismatches, SSIM, blur, retries, runtime hooks, console dumps and non-PNG input. Decoding matches pngjs byte for byte across PNG color types, 16-bit images, palettes, interlacing, transparency chunks and embedded color profiles.
 
@@ -147,9 +147,9 @@ Three kinds of tests check that this package behaves like jest-image-snapshot 6.
 Known differences:
 
 - A large failing screenshot, such as the benchmark's 1280×8000 page, can make jest-image-snapshot throw `spawnSync ... ENOBUFS` with its default settings. Its child process returns the diff image as base64, which can exceed the default 10 MB `maxChildProcessBufferSizeInBytes`. This package reports the failure normally.
-- `runInProcess` and `maxChildProcessBufferSizeInBytes` are accepted but do nothing, since there is no child process.
+- The matcher accepts `runInProcess` and `maxChildProcessBufferSizeInBytes` but ignores them, since there is no child process.
 - A corrupted PNG throws in both packages, but the error message comes from libpng instead of pngjs, for example `vipspng: libpng read error` instead of `Unrecognised filter type - 104`.
-- Diff images are encoded differently, so their bytes differ from jest-image-snapshot's, but their pixels are identical.
+- This package encodes diff images differently, so their bytes differ from jest-image-snapshot's, but their pixels are identical.
 - `comparisonMethod: 'blazediff'` is new in this package. jest-image-snapshot treats any value other than `'ssim'` as pixelmatch.
 - pixelmatch stays pinned to 5.x, the version jest-image-snapshot uses. pixelmatch 7 and 8 changed how they count differing pixels, which would flip existing thresholds.
 
@@ -165,7 +165,7 @@ pnpm bench           # current source vs the latest release and jest-image-snaps
 pnpm bench:runners   # benchmark tables from the README, in real Jest and Vitest runs
 ```
 
-Integration tests can target another runner version: install it with `pnpm --dir test/runners/vitest-3 install`, then run `pnpm vitest run test/integration.test.ts` with `INTEGRATION_RUNNERS=vitest` and `VITEST_MODULES` (or `JEST_MODULES`) pointing at that directory's `node_modules`.
+Integration tests can target another runner version. Install it with `pnpm --dir test/runners/vitest-3 install`, then run `pnpm vitest run test/integration.test.ts` with `INTEGRATION_RUNNERS=vitest` and `VITEST_MODULES` set to that directory's `node_modules`. For a Jest version, set `INTEGRATION_RUNNERS=jest` and `JEST_MODULES` instead.
 
 ## License
 
