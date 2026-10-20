@@ -2,8 +2,8 @@ import { Buffer } from 'node:buffer'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { configureToMatchImageSnapshot } from '../src/index.ts'
-import type { MatcherContext, SnapshotState } from '../src/index.ts'
+import { configureToMatchImageSnapshot, configureToMatchImageSnapshotAsync } from '../src/index.ts'
+import type { MatcherContext, MatcherResult, SnapshotState } from '../src/index.ts'
 import type { MatchImageSnapshotOptions } from '../src/types.ts'
 import { reference, ReferencePNG } from './reference.ts'
 
@@ -83,18 +83,35 @@ const normalizeMessage = (message: string, directory: string) =>
 
 const RETRY_TIMES = Symbol.for('RETRY_TIMES')
 
-const withEnvironment = <T>(scenario: Scenario, run: () => T): T => {
+const applyEnvironment = (scenario: Scenario) => {
   const globals = globalThis as Record<symbol, unknown>
   const previousEnv = { ...process.env }
   Object.assign(process.env, scenario.env)
   if (scenario.retryTimes !== undefined) {
     globals[RETRY_TIMES] = scenario.retryTimes
   }
+  return () => {
+    process.env = previousEnv
+    delete globals[RETRY_TIMES]
+  }
+}
+
+const withEnvironment = <T>(scenario: Scenario, run: () => T): T => {
+  const restore = applyEnvironment(scenario)
   try {
     return run()
   } finally {
-    process.env = previousEnv
-    delete globals[RETRY_TIMES]
+    restore()
+  }
+}
+
+// The environment has to stay in place until the last awaited step is done
+const withEnvironmentAsync = async <T>(scenario: Scenario, run: () => Promise<T>): Promise<T> => {
+  const restore = applyEnvironment(scenario)
+  try {
+    return await run()
+  } finally {
+    restore()
   }
 }
 
@@ -123,45 +140,85 @@ const stepOutcome = (pass: boolean, before: Counters, after: Counters): Outcome 
   return 'pass'
 }
 
+const stepResult = (result: MatcherResult, before: Counters, snapshotState: SnapshotState, directory: string) => {
+  const after = readCounters(snapshotState)
+  return {
+    outcome: stepOutcome(result.pass, before, after),
+    pass: result.pass,
+    message: normalizeMessage(result.message(), directory),
+    counters: after,
+  }
+}
+
+const stepError = (error: unknown, snapshotState: SnapshotState, directory: string) => ({
+  outcome: 'error' as const,
+  error: normalizeMessage((error as Error).message, directory),
+  counters: readCounters(snapshotState),
+})
+
+// Each step is a new test run unless it continues the previous one
+const createStepRunner = (scenario: Scenario, directory: string) => {
+  let snapshotState = createSnapshotState('new')
+  return (step: Step) => {
+    if (!step.sameRun) {
+      snapshotState = createSnapshotState(step.updateSnapshot ?? scenario.updateSnapshot ?? 'new')
+    }
+    const context: MatcherContext = {
+      testPath: path.join(directory, 'example.test.ts'),
+      currentTestName: step.testName ?? 'example test',
+      isNot: step.isNot ?? false,
+      snapshotState,
+    }
+    return { context, snapshotState, before: readCounters(snapshotState) }
+  }
+}
+
+const createDirectory = () => fs.mkdtempSync(path.join(os.tmpdir(), 'image-snapshot-compat-'))
+
+const matcherOptions = (scenario: Scenario, directory: string): MatchImageSnapshotOptions => ({
+  noColors: true,
+  ...scenario.commonOptions,
+  ...scenario.dirOptions?.(directory),
+})
+
 export const runScenario = (implementation: Implementation, scenario: Scenario) =>
   withEnvironment(scenario, () => {
-    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'image-snapshot-compat-'))
+    const directory = createDirectory()
     try {
-      const matcher = implementation({
-        noColors: true,
-        ...scenario.commonOptions,
-        ...scenario.dirOptions?.(directory),
-      })
-      let snapshotState = createSnapshotState('new')
+      const matcher = implementation(matcherOptions(scenario, directory))
+      const prepareStep = createStepRunner(scenario, directory)
       const steps = scenario.steps.map((step) => {
-        // Each step is a new test run unless it continues the previous one
-        if (!step.sameRun) {
-          snapshotState = createSnapshotState(step.updateSnapshot ?? scenario.updateSnapshot ?? 'new')
-        }
-        const context: MatcherContext = {
-          testPath: path.join(directory, 'example.test.ts'),
-          currentTestName: step.testName ?? 'example test',
-          isNot: step.isNot ?? false,
-          snapshotState,
-        }
-        const before = readCounters(snapshotState)
+        const { context, snapshotState, before } = prepareStep(step)
         try {
-          const result = matcher.call(context, step.received, step.options)
-          const after = readCounters(snapshotState)
-          return {
-            outcome: stepOutcome(result.pass, before, after),
-            pass: result.pass,
-            message: normalizeMessage(result.message(), directory),
-            counters: after,
-          }
+          return stepResult(matcher.call(context, step.received, step.options), before, snapshotState, directory)
         } catch (error) {
-          return {
-            outcome: 'error' as const,
-            error: normalizeMessage((error as Error).message, directory),
-            counters: readCounters(snapshotState),
-          }
+          return stepError(error, snapshotState, directory)
         }
       })
+      return { steps, files: snapshotFiles(directory) }
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+// Same steps through the async matcher, awaiting each check before the next one starts
+export const runScenarioAsync = (scenario: Scenario) =>
+  withEnvironmentAsync(scenario, async () => {
+    const directory = createDirectory()
+    try {
+      const matcher = configureToMatchImageSnapshotAsync(matcherOptions(scenario, directory))
+      const prepareStep = createStepRunner(scenario, directory)
+      const steps = []
+      for (const step of scenario.steps) {
+        const { context, snapshotState, before } = prepareStep(step)
+        try {
+          // Steps share snapshot files and must run in order
+          const result = await matcher.call(context, step.received, step.options)
+          steps.push(stepResult(result, before, snapshotState, directory))
+        } catch (error) {
+          steps.push(stepError(error, snapshotState, directory))
+        }
+      }
       return { steps, files: snapshotFiles(directory) }
     } finally {
       fs.rmSync(directory, { recursive: true, force: true })

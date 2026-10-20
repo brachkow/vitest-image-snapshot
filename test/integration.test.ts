@@ -185,3 +185,93 @@ describe.each(selectedRunners)('in a real %s run', (runner) => {
     expect(fs.existsSync(stale)).toBe(true)
   })
 })
+
+const vitestMajor = Number(
+  SEMVER_MAJOR.exec(
+    spawnSync(process.execPath, [RUNNERS.vitest.args(RUNNERS.vitest.modules, '', false)[0], '--version'], {
+      encoding: 'utf8',
+    }).stdout,
+  )?.[1],
+)
+
+// Vitest 3 builds a custom matcher's `this` from the global expect's state, which holds the
+// test that started last. Vitest 4 and 5 read the test from the assertion itself.
+describe.runIf(selectedRunners.includes('vitest'))('in a real vitest run with test.concurrent', () => {
+  const { modules, args } = RUNNERS.vitest
+  const fixture = path.join(root, 'test/integration/vitest-concurrent-project')
+  let directory: string
+  let project: string
+  const snapshotsDirectory = () => path.join(directory, 'snapshots')
+  const snapshotFiles = () =>
+    fs
+      .readdirSync(snapshotsDirectory())
+      .filter((file) => file.endsWith('-snap.png'))
+      .toSorted()
+  const readSnapshot = (suffix: string) => {
+    const file = snapshotFiles().find((name) => name.endsWith(suffix))
+    expect(file, `no snapshot ending with ${suffix} in ${snapshotFiles().join(', ')}`).toBeDefined()
+    return fs.readFileSync(path.join(snapshotsDirectory(), file ?? ''))
+  }
+
+  const run = (matcher: 'sync' | 'async') => {
+    const firstImagePath = path.join(directory, 'first.png')
+    const secondImagePath = path.join(directory, 'second.png')
+    fs.writeFileSync(firstImagePath, base)
+    fs.writeFileSync(secondImagePath, changed)
+    const env = { ...process.env }
+    delete env.CI
+    delete env.GITHUB_ACTIONS
+    const result = spawnSync(process.execPath, args(modules, project, false), {
+      cwd: project,
+      env: {
+        ...env,
+        PACKAGE_DIR: root,
+        FIRST_IMAGE_PATH: firstImagePath,
+        SECOND_IMAGE_PATH: secondImagePath,
+        SNAPSHOTS_DIR: snapshotsDirectory(),
+        MATCHER: matcher,
+        FORCE_COLOR: '0',
+      },
+      encoding: 'utf8',
+    })
+    return { status: result.status, output: result.stdout + result.stderr }
+  }
+
+  beforeEach(() => {
+    directory = fs.mkdtempSync(path.join(os.tmpdir(), 'image-snapshot-vitest-concurrent-'))
+    project = path.join(directory, 'project')
+    fs.cpSync(fixture, project, { recursive: true, filter: (source) => path.basename(source) !== 'node_modules' })
+    fs.symlinkSync(modules, path.join(project, 'node_modules'), 'junction')
+  })
+
+  afterEach(() => {
+    fs.rmSync(directory, { recursive: true, force: true })
+  })
+
+  test.runIf(vitestMajor >= 4).each(['sync', 'async'] as const)(
+    'names each snapshot after the test that took it (%s matcher)',
+    (matcher) => {
+      // Act
+      const { status, output } = run(matcher)
+
+      // Assert
+      expect(status, output).toBe(0)
+      expect(readSnapshot('-first-1-snap.png').equals(base)).toBe(true)
+      expect(readSnapshot('-second-1-snap.png').equals(changed)).toBe(true)
+    },
+  )
+
+  // Documents the limitation the README describes, and fails if Vitest 3 ever changes it
+  test.runIf(vitestMajor === 3).each(['sync', 'async'] as const)(
+    'Vitest 3 names both snapshots after the test that started last (%s matcher)',
+    (matcher) => {
+      // Act
+      const { status, output } = run(matcher)
+
+      // Assert
+      expect(status, output).toBe(0)
+      expect(snapshotFiles().every((file) => file.includes('-second-'))).toBe(true)
+      expect(snapshotFiles()).toHaveLength(2)
+    },
+  )
+})

@@ -3,7 +3,8 @@ import os from 'node:os'
 import path from 'node:path'
 import sharp from 'sharp'
 import { afterAll, describe, expect, test } from 'vitest'
-import { runBoth } from './compat.ts'
+import { configureToMatchImageSnapshot } from '../src/index.ts'
+import { runBoth, runScenario, runScenarioAsync } from './compat.ts'
 import type { Outcome, Scenario } from './compat.ts'
 import { encodePalette, encodeWithPngjs, flatPattern, withRectangle } from './fixtures.ts'
 import type { PixelPattern } from './fixtures.ts'
@@ -367,6 +368,23 @@ describe('behaves exactly like jest-image-snapshot 6.5.2', () => {
 
     // Assert
     expect(expected.steps.map((step) => step.outcome)).toEqual(['added', 'pass'])
+    expect(actual).toEqual(expected)
+  })
+})
+
+// The sync matcher is held to jest-image-snapshot above, the async one to the sync one:
+// same outcomes, messages, counters and written files for every scenario
+describe('toMatchImageSnapshotAsync behaves exactly like toMatchImageSnapshot', () => {
+  test.each(Object.entries(scenarios))('%s', async (_name, scenario) => {
+    // Arrange
+    const { outcomes, ...steps } = scenario
+
+    // Act
+    const actual = await runScenarioAsync(steps)
+    const expected = runScenario(configureToMatchImageSnapshot, steps)
+
+    // Assert
+    expect(actual.steps.map((step) => step.outcome)).toEqual(outcomes)
     expect(actual).toEqual(expected)
   })
 })

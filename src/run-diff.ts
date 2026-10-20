@@ -3,14 +3,17 @@ import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { createSyncFn } from 'synckit'
 import { assertPngSignature } from './png-signature.ts'
+import { createWorkerPool } from './worker-pool.ts'
 import { snapshotPaths, validateFailureThresholdType } from './snapshot-paths.ts'
 import type { DiffOptions, DiffResult } from './types.ts'
 
 // Sources run as .ts under Vitest, the build ships the worker as .mjs next to the entry
 const WORKER_EXTENSION = import.meta.url.endsWith('.ts') ? '.ts' : '.mjs'
 const workerPath = fileURLToPath(new URL(`worker${WORKER_EXTENSION}`, import.meta.url))
+const asyncWorkerPath = fileURLToPath(new URL(`async-worker${WORKER_EXTENSION}`, import.meta.url))
 
 let diffInWorker: ((options: DiffOptions) => DiffResult) | undefined
+let workerPool: ReturnType<typeof createWorkerPool> | undefined
 
 // Most checks in a passing suite get exactly the baseline's bytes back, which needs
 // no decoding and no worker. Comparing 2 MB of bytes takes about 1 ms.
@@ -49,4 +52,15 @@ export const runDiffImageToSnapshot = (options: DiffOptions): DiffResult => {
   // Started on first use, so a suite where every check matches never pays the worker startup
   diffInWorker ??= createSyncFn<(options: DiffOptions) => Promise<DiffResult>>(workerPath)
   return diffInWorker(options)
+}
+
+// Same checks as runDiffImageToSnapshot, but the diff runs in a pool of workers and the
+// calling thread stays free, so concurrent tests can diff while others drive the browser
+export const runDiffImageToSnapshotAsync = async (options: DiffOptions): Promise<DiffResult> => {
+  const fastResult = tryIdenticalBytes(options)
+  if (fastResult) {
+    return fastResult
+  }
+  workerPool ??= createWorkerPool(asyncWorkerPath)
+  return workerPool.run(options)
 }

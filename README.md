@@ -36,6 +36,28 @@ expect.extend({ toMatchImageSnapshot })
 
 The matcher is synchronous, so no `await` is needed, same as before. Every jest-image-snapshot option works: `failureThreshold`, `failureThresholdType`, `customDiffConfig`, `comparisonMethod: 'ssim'`, `blur`, `allowSizeMismatch`, `customSnapshotIdentifier`, `customSnapshotsDir`, `customDiffDir`, `storeReceivedOnFailure`, `runtimeHooksPath`, `dumpDiffToConsole` and the rest. See the [jest-image-snapshot option list](https://github.com/americanexpress/jest-image-snapshot#optional-configuration).
 
+### Async matcher for concurrent tests
+
+`toMatchImageSnapshot` blocks the test thread while it diffs, so other tests in a `test.concurrent` file wait for it. `toMatchImageSnapshotAsync` takes the same options and gives the same results, but it diffs in a pool of worker threads and returns a promise, so it needs `await`.
+
+```js
+import { expect, test } from 'vitest'
+import { toMatchImageSnapshotAsync } from '@brachkow/vitest-image-snapshot'
+
+expect.extend({ toMatchImageSnapshotAsync })
+
+test.concurrent('renders the button', async ({ expect }) => {
+  const image = await page.screenshot()
+  await expect(image).toMatchImageSnapshotAsync()
+})
+```
+
+Byte-identical screenshots still pass without a worker. The pool starts workers when checks need them, up to 4 or one less than the number of CPU cores, whichever is lower. `IMAGE_SNAPSHOT_WORKERS` sets a different limit. `configureToMatchImageSnapshotAsync(options)` sets shared options, like `configureToMatchImageSnapshot`.
+
+### Concurrent tests
+
+Snapshot names include the test name, so concurrent tests must assert through their own test context's `expect`, as in the example above. Vitest 4 and 5 then name each snapshot after the test that runs the check. Vitest 3 gives custom matchers the name of the test that started last, so a concurrent test can write or compare another test's snapshot. On Vitest 3, set a unique `customSnapshotIdentifier` for each check, or run image snapshot tests one at a time.
+
 ### Waiting for a stable screenshot
 
 `waitForStableScreenshot` captures until two screenshots in a row are byte-identical and returns the last one. A late font, image or CSS transition then costs a retry instead of a flaky failure. Vitest's `toMatchScreenshot` checks stability the same way before it compares.
@@ -159,7 +181,7 @@ Three kinds of tests check that this package behaves like jest-image-snapshot 6.
 
 **The original test suite.** [`test/original`](test/original) holds jest-image-snapshot's own integration spec, with its stub images and baselines, run against this package with `pnpm test:original`. All 25 tests pass. Run with `IMAGE_SNAPSHOT_IMPLEMENTATION=original`, the same spec also passes against jest-image-snapshot itself, which shows the copy is still a valid test. The copy has three changes, listed at the top of the file: the import, comparing the `onlyDiff` image by pixels instead of PNG bytes, and a fix for a TypedArray test that fails on Node 22 and newer for jest-image-snapshot too. The other original spec files mock internals that this package doesn't have, such as `child_process` and the `diff-snapshot` module, so this repo leaves them out.
 
-**Side-by-side scenarios.** The Vitest suite runs jest-image-snapshot 6.5.2 and this package on the same inputs, across 54 scenarios. It checks that they return the same pass/fail result, message and snapshot counters, write the same files with byte-identical baselines, and produce pixel-identical diff images. The scenarios cover every option, update and CI modes, size mismatches, SSIM, blur, retries, runtime hooks, console dumps and non-PNG input. Decoding matches pngjs byte for byte across PNG color types, 16-bit images, palettes, interlacing, transparency chunks and embedded color profiles.
+**Side-by-side scenarios.** The Vitest suite runs jest-image-snapshot 6.5.2 and this package on the same inputs, across 54 scenarios. `toMatchImageSnapshotAsync` runs the same scenarios and must match `toMatchImageSnapshot` exactly. It checks that they return the same pass/fail result, message and snapshot counters, write the same files with byte-identical baselines, and produce pixel-identical diff images. The scenarios cover every option, update and CI modes, size mismatches, SSIM, blur, retries, runtime hooks, console dumps and non-PNG input. Decoding matches pngjs byte for byte across PNG color types, 16-bit images, palettes, interlacing, transparency chunks and embedded color profiles.
 
 **Real runners.** Integration tests run real Jest and Vitest processes against the built package. CI runs them on Jest 29 and 30 and Vitest 3, 4 and 5, each installed from its own lockfile in [`test/runners`](test/runners). The full suite also runs on Linux, macOS and Windows with Node 22 and 24.
 
@@ -169,7 +191,7 @@ Known differences:
 - The matcher accepts `runInProcess` and `maxChildProcessBufferSizeInBytes` but ignores them, since there is no child process.
 - A corrupted PNG throws in both packages, but the error message comes from libpng instead of pngjs, for example `vipspng: libpng read error` instead of `Unrecognised filter type - 104`.
 - This package encodes diff images differently, so their bytes differ from jest-image-snapshot's, but their pixels are identical.
-- `comparisonMethod: 'blazediff'`, `diffCompressionLevel` and `waitForStableScreenshot` are new in this package. jest-image-snapshot treats any `comparisonMethod` other than `'ssim'` as pixelmatch and ignores unknown options.
+- `comparisonMethod: 'blazediff'`, `diffCompressionLevel`, `toMatchImageSnapshotAsync` and `waitForStableScreenshot` are new in this package. jest-image-snapshot treats any `comparisonMethod` other than `'ssim'` as pixelmatch and ignores unknown options.
 - pixelmatch stays pinned to 5.x, the version jest-image-snapshot uses. pixelmatch 7 and 8 changed how they count differing pixels, which would flip existing thresholds.
 
 ## Development

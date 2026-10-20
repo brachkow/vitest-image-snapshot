@@ -32,6 +32,7 @@ The matcher must stay synchronous (`expect(x).toMatchImageSnapshot()` with no `a
 - **Main thread.** `src/index.ts` and `src/run-diff.ts` do the Jest and Vitest bookkeeping: the snapshot identifier, `snapshotState` counters and messages. Then they compare the received PNG's bytes with the baseline file. Identical bytes pass here without loading sharp or starting the worker. This module must not import sharp or the image code.
 - **Worker thread.** `src/worker.ts` calls `src/diff-snapshot.ts`, which uses `src/image.ts` to decode with sharp, align sizes, blur when asked, compare, and compose and encode the 3-panel diff. `synckit` calls the worker synchronously and starts it on first use. It runs in plain Node, outside Jest's `vm` sandbox, where global lookups such as `Math.abs` are about 240 times slower.
 - `src/run-diff.ts` loads `worker.ts` when running from source, which Vitest does directly, and `worker.mjs` from `dist/`. The CJS build gets `import.meta.url` through tsdown's `shims`.
+- `toMatchImageSnapshotAsync` is the opt-in exception. `src/index.ts` runs the same synchronous bookkeeping for both matchers (`configureMatcher`), and only the diff differs: the async one sends it to `src/worker-pool.ts`, a pool of plain `worker_threads` workers running `src/async-worker.ts`. It must produce exactly what the sync matcher produces, which `test/compat.test.ts` checks for every scenario.
 
 Details that keep results identical to the original:
 

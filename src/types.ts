@@ -94,4 +94,12 @@ export interface DiffResult {
   imgSrcString?: string
 }
 
+export interface DiffRequest {
+  id: number
+  options: DiffOptions
+}
+
+export type DiffResponse =
+  { id: number; result: DiffResult } | { id: number; error: { name: string; message: string; stack?: string } }
+
 export { type DiffDirection } from './image.ts'

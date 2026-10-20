@@ -10,8 +10,8 @@ import path from 'node:path'
 import { styleText } from 'node:util'
 import { kebabCase, merge } from 'es-toolkit/compat'
 import { markTouchedFile } from './touched-files.ts'
-import { runDiffImageToSnapshot } from './run-diff.ts'
-import type { CustomSnapshotIdentifierParams, DiffResult, MatchImageSnapshotOptions } from './types.ts'
+import { runDiffImageToSnapshot, runDiffImageToSnapshotAsync } from './run-diff.ts'
+import type { CustomSnapshotIdentifierParams, DiffOptions, DiffResult, MatchImageSnapshotOptions } from './types.ts'
 
 export type * from './types.ts'
 export { waitForStableScreenshot } from './stable-screenshot.ts'
@@ -194,28 +194,37 @@ const createSnapshotIdentifier = ({
 const readRetryTimes = (): number =>
   Number.parseInt(String((globalThis as Record<symbol, unknown>)[Symbol.for('RETRY_TIMES')]), 10) || 0
 
-export const configureToMatchImageSnapshot = ({
-  customDiffConfig: commonCustomDiffConfig = {},
-  customSnapshotIdentifier: commonCustomSnapshotIdentifier,
-  customSnapshotsDir: commonCustomSnapshotsDirectory,
-  storeReceivedOnFailure: commonStoreReceivedOnFailure = false,
-  customReceivedDir: commonCustomReceivedDirectory,
-  customReceivedPostfix: commonCustomReceivedPostfix,
-  customDiffDir: commonCustomDiffDirectory,
-  onlyDiff: commonOnlyDiff = false,
-  runtimeHooksPath: commonRuntimeHooksPath,
-  diffDirection: commonDiffDirection = 'horizontal',
-  noColors: commonNoColors,
-  failureThreshold: commonFailureThreshold = 0,
-  failureThresholdType: commonFailureThresholdType = 'pixel',
-  updatePassedSnapshot: commonUpdatePassedSnapshot = false,
-  blur: commonBlur = 0,
-  dumpDiffToConsole: commonDumpDiffToConsole = false,
-  dumpInlineDiffToConsole: commonDumpInlineDiffToConsole = false,
-  allowSizeMismatch: commonAllowSizeMismatch = false,
-  comparisonMethod: commonComparisonMethod = 'pixelmatch',
-  diffCompressionLevel: commonDiffCompressionLevel = 1,
-}: MatchImageSnapshotOptions = {}) =>
+// Everything up to the diff is synchronous bookkeeping that both matchers share: the
+// identifier, the snapshotState counters and the CI check. Only running the diff differs.
+type Prepared = { done: MatcherResult } | { diffOptions: DiffOptions; finish: (result: DiffResult) => MatcherResult }
+
+type Compare<Result> = (prepared: Prepared) => Result
+
+const configureMatcher = <Result>(
+  compare: Compare<Result>,
+  {
+    customDiffConfig: commonCustomDiffConfig = {},
+    customSnapshotIdentifier: commonCustomSnapshotIdentifier,
+    customSnapshotsDir: commonCustomSnapshotsDirectory,
+    storeReceivedOnFailure: commonStoreReceivedOnFailure = false,
+    customReceivedDir: commonCustomReceivedDirectory,
+    customReceivedPostfix: commonCustomReceivedPostfix,
+    customDiffDir: commonCustomDiffDirectory,
+    onlyDiff: commonOnlyDiff = false,
+    runtimeHooksPath: commonRuntimeHooksPath,
+    diffDirection: commonDiffDirection = 'horizontal',
+    noColors: commonNoColors,
+    failureThreshold: commonFailureThreshold = 0,
+    failureThresholdType: commonFailureThresholdType = 'pixel',
+    updatePassedSnapshot: commonUpdatePassedSnapshot = false,
+    blur: commonBlur = 0,
+    dumpDiffToConsole: commonDumpDiffToConsole = false,
+    dumpInlineDiffToConsole: commonDumpInlineDiffToConsole = false,
+    allowSizeMismatch: commonAllowSizeMismatch = false,
+    comparisonMethod: commonComparisonMethod = 'pixelmatch',
+    diffCompressionLevel: commonDiffCompressionLevel = 1,
+  }: MatchImageSnapshotOptions = {},
+) =>
   function toMatchImageSnapshot(
     this: MatcherContext,
     received: Received,
@@ -241,7 +250,7 @@ export const configureToMatchImageSnapshot = ({
       comparisonMethod = commonComparisonMethod,
       diffCompressionLevel = commonDiffCompressionLevel,
     }: MatchImageSnapshotOptions = {},
-  ): MatcherResult {
+  ): Result {
     const { testPath = '', currentTestName = '', isNot } = this
     const snapshotState = this.snapshotState as SnapshotState
     const paint = createPaint(noColors)
@@ -268,16 +277,18 @@ export const configureToMatchImageSnapshot = ({
     markTouchedFile(baselineSnapshotPath)
 
     if (snapshotState._updateSnapshot === 'none' && !fs.existsSync(baselineSnapshotPath)) {
-      return {
-        pass: false,
-        message: () =>
-          `New snapshot was ${paint(['bold', 'red'], 'not written')}. The update flag must be explicitly ` +
-          'passed to write a new snapshot.\n\n + This is likely because this test is run in a continuous ' +
-          'integration (CI) environment in which snapshots are not written by default.\n\n',
-      }
+      return compare({
+        done: {
+          pass: false,
+          message: () =>
+            `New snapshot was ${paint(['bold', 'red'], 'not written')}. The update flag must be explicitly ` +
+            'passed to write a new snapshot.\n\n + This is likely because this test is run in a continuous ' +
+            'integration (CI) environment in which snapshots are not written by default.\n\n',
+        },
+      })
     }
 
-    const result = runDiffImageToSnapshot({
+    const diffOptions: DiffOptions = {
       receivedImageBuffer: toBuffer(received),
       snapshotsDirectory,
       storeReceivedOnFailure,
@@ -300,18 +311,46 @@ export const configureToMatchImageSnapshot = ({
       diffCompressionLevel,
       runtimeHooksPath,
       includeImgSrcString: dumpDiffToConsole || dumpInlineDiffToConsole,
-    })
+    }
 
-    return checkResult({
-      result,
-      snapshotState,
-      retryTimes,
-      snapshotIdentifier,
-      paint,
-      dumpDiffToConsole,
-      dumpInlineDiffToConsole,
-      allowSizeMismatch,
+    return compare({
+      diffOptions,
+      finish: (result) =>
+        checkResult({
+          result,
+          snapshotState,
+          retryTimes,
+          snapshotIdentifier,
+          paint,
+          dumpDiffToConsole,
+          dumpInlineDiffToConsole,
+          allowSizeMismatch,
+        }),
     })
   }
 
+const compareInWorker: Compare<MatcherResult> = (prepared) =>
+  'done' in prepared ? prepared.done : prepared.finish(runDiffImageToSnapshot(prepared.diffOptions))
+
+const compareInPool: Compare<Promise<MatcherResult>> = async (prepared) =>
+  'done' in prepared ? prepared.done : prepared.finish(await runDiffImageToSnapshotAsync(prepared.diffOptions))
+
+export const configureToMatchImageSnapshot = (options: MatchImageSnapshotOptions = {}) =>
+  configureMatcher(compareInWorker, options)
+
 export const toMatchImageSnapshot = configureToMatchImageSnapshot()
+
+// Opt-in: returns a promise, so it needs `await expect(image).toMatchImageSnapshotAsync()`.
+// The diff runs in a worker pool and the test thread keeps running other concurrent tests.
+export const configureToMatchImageSnapshotAsync = (options: MatchImageSnapshotOptions = {}) => {
+  const matcher = configureMatcher(compareInPool, options)
+  // Errors thrown before the first await, such as for `.not`, become rejections
+  return async function toMatchImageSnapshotAsync(
+    this: MatcherContext,
+    ...args: Parameters<typeof matcher>
+  ): Promise<MatcherResult> {
+    return matcher.apply(this, args)
+  }
+}
+
+export const toMatchImageSnapshotAsync = configureToMatchImageSnapshotAsync()

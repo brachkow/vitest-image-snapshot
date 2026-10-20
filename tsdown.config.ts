@@ -14,8 +14,8 @@ export default defineConfig([
     shims: true,
   },
   {
-    // The worker always runs in a plain Node thread, so ESM alone is enough
-    entry: { worker: 'src/worker.ts' },
+    // The workers always run in a plain Node thread, so ESM alone is enough
+    entry: { worker: 'src/worker.ts', 'async-worker': 'src/async-worker.ts' },
     format: 'esm',
     platform: 'node',
     fixedExtension: true,
